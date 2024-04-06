@@ -1,0 +1,87 @@
+# Criando repositórios no Github
+
+## Tópicos
+
+- Markdown
+- Criação
+- README
+- .gitignore
+- CNAME
+- Issues
+- Pull Requests
+- Wiki/Documentação
+- Settings
+- Discussão
+- Licença
+- Forks
+
+
+## A criação de um repositório contém poucos passos:
+
+Name - O name fará parte da URL do mesmo: https://github.com/seulogin/name. Quanto mais representativo do conteúdo mais fácil de ser achado. Idealmente em minúsculas. Nomes compostos separados por um hífen (Ex.: admin-br) para atender exigências do Packagist. Também para facilitar eu prefiro os nomes pequenos.
+
+Description - a descrição aparecerá do lado direito, poderá mostrar um domínio customizado e tags que ajudam no SEO.
+
+Public ou Private
+
+Inicializar com: README, .gitignore e Licença
+
+## README.md - este é o cartão de visitas do repositório, funciona como o index.html em sites com HTML.
+
+Eu crio um projeto sempre que considero que criei algo que pode ser útil para mais alguém. Então faço o possível para que o README seja simples e o mais claro possível quanto ao objetivo do projeto.
+Então cuido bem deste arquivo, formato de forma elegante (usando os recursos do Markdown) e também oferecer todas as informações necessárias para que o vivitante.
+Uma boa ideia é oferecer um arquivo .SQL caso o projeto trabalhe com bancos de dados e que apareça no raiz, para que o visitante não fique procurando e tenha facilidade para testá-lo.
+
+## .gitignore
+
+Ele contém os nomes de arquivos e pastas que não serão enviados para o github no upload. As principais são vendor e node_modules. Mas existem diversos outros:
+https://git-scm.com/docs/gitignore
+https://fjorgemota.com/gitignore-ou-como-ignorar-arquivos-no-git/
+
+## CNAME
+
+Caso usemos um domínio customizado com a nossa conta do Github, precisamos adicionar o arquivo CNAME no raiz do repositório principal contendo o domínio. Meu exemplo: a minha conta aqui é 'ribafs' e o domínio que associei ao Github foi o 'ribafs.me'. Então eu tenho um repositório chamado 'ribafs' (pode ser outro nome) então vou em settings e mudo o Repository name para 'ribafs.github.io' e mais abaixo em 'Github Pages' eu indico o Custom domain 'ribafs.me'.
+
+## Wiki/Documentação
+
+Se o projeto tiver uma documentação mais abrangente é uma boa ideia usar a Wiki para documentá-lo e lembre de criar um tópico sobre ele no README, apontando para a Wiki. Uma alternativa é a criação de um site com o MkDocs e criar uma Github Page para o mesmo (Veja este exemplo: https://ribafs.me/laravel-acl/, que inclusive traz um tutorial sobre o MkDocs https://ribafs.me/laravel-acl/documentation/).
+
+## Issues
+
+Uma boa forma de receber feedback dos visitantes/usuários é através dos Issues. Veja que o Github atualmente oferece os labels coloridos para marcar os issues por categoria, transformando um projeto com uma grande quantidade de issues praticamente em um forum. Os issues são usados geralmente para que o usuário avise sobre problemas encotnrados no projeto mas podem ser usados livremente. Inclusive aceitam envio de anexos.
+
+## Pull requests
+
+Estes também contam com os labels e são usados principalmente para a sugestão de novas funcionalidades e para o envio de código com as sugestões.
+
+## Discussões
+
+Para projetos que possam ser usados por muitos usuários podemos ativar as discussões em Settings. Um recurso semelhante a um forum e bem amigável.
+
+## Settings
+
+Aqui aparecem as principais configurações específicas deste respositório. Temos também vinculado à nossa conta, outro Settings, com configurações gerais da conta, como Chaves do SSH e várias outras.
+
+Sobre este repositório podemos:
+- Renomear o projeto
+- Restringir edição somente para colaboradores ou abertas a qualquer outro usuário com conta no GH
+- habilitar/desabilitar
+    - Wikis
+    - Issues    
+    - Discussões
+- Acesso as Github pages
+- Mudar visibilidade public/private
+- Transferir o projeto para outro dono
+- Arquivar repositório (somente leitura)
+- Excluir repositório
+
+## URL do Projeto no README
+
+Aogo imortante e que muitos criadores de projeto e squeçem é anotar no README o link do projeto. Muitas vezes baixamos o projeto e depois de algum tempo não mais nos lembramos de onde baixamos e não podemos pegar a versão mais atualizada, deixar um feedback, efetuar um fork, etc. Então manter o link do próprio projeto no README é uma boa prática.
+
+Um arquivo muito importante é o
+
+
+## Licença
+
+Ao final é importante citar explicitamente a licença do projeto.

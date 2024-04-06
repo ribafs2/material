@@ -1,0 +1,47 @@
+Exportar uma box
+
+Isso permite que instalemos a box com agilidade, sem necessidade de efetuar o download novamente e efetuar todas as configurações que já fizemos
+É bom também instalar o LAMP e então exportar a box
+
+Quando a box está atualizada e do jeito que quero posso exportar para guardar um backup ou para distribuir, inclusive enviar para o Vagrant
+
+Após instalar a box:
+- Atualizar a distro
+- Atualizar box: vagrant box update
+- Instalar vbguest:
+De fora da box, estando no desktop
+sudo vagrant plugin install vagrant-vbguest
+- Exportar para servir de base mais facilmente para nosos projetos
+Por padrão o vagrant exporta a box em um arquivo com nome package.box, mas podemos exportar com o nome desejado com:
+
+cd ub2004
+vagrant package --output ub2004.box
+
+Para fazer o backup ou transportar precisaremos dos arquivos:
+
+- ub2004.box
+- Vagrantfile
+
+Restaurando a box exportada
+
+- Criar uma pasta no home
+cd vagrant
+mkdir ubuntu2004
+cd  ubuntu2004
+- Copiar os arquivos package.box e Vagrantfile para a pasta acima
+- Mudar no Vagrantfile a linha 
+config.vm.box = "bento/ubuntu-20.04"
+Para
+config.vm.box = "./ub2004.box"
+
+Obs.: podemos manter o arquivo ub2004.box em qualquer pasta, desde que indiquemos essa pasta na linha do vm.box
+
+Executar
+
+vagrant up
+vagrant ssh
+
+Pronto
+
+
+

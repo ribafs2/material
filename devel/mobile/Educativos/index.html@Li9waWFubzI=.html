@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>JS Piano Kit</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet"
+        href="piano2/style.css">
+</head>
+
+<body>
+  <section class="heading">
+    <h1>Piano Família FS</h1>
+    <span class="subhead">Você pode clicar nas notas ou pressionar as letras abaixo para tocar as teclas.</span>
+  </section>
+  <ul class="set">
+
+    <li data-key="a"
+        class="key white a2">
+      <kbd>A</kbd>
+      <span class="sound">a</span>
+    </li>
+    <li data-key="w"
+        class="key black bFlat">
+      <kbd>W</kbd>
+      <span class="sound high">b&#9837;</span>
+    </li>
+    <li data-key="s"
+        class="key white b">
+      <kbd>S</kbd>
+      <span class="sound">b</span>
+    </li>
+    <li data-key="d"
+        class="key white c3">
+      <kbd>D</kbd>
+      <span class="sound">c</span>
+    </li>
+    <li data-key="r"
+        class="key black cSharp">
+      <kbd>R</kbd>
+      <span class="sound high">c&#35;</span>
+    </li>
+    <li data-key="f"
+        class="key white d">
+      <kbd>F</kbd>
+      <span class="sound">d</span>
+    </li>
+    <li data-key="t"
+        class="key black eFlat">
+      <kbd>T</kbd>
+      <span class="sound high">e&#9837;</span>
+    </li>
+    <li data-key="g"
+        class="key white e">
+      <kbd>G</kbd>
+      <span class="sound">e</span>
+    </li>
+    <li data-key="h"
+        class="key white f">
+      <kbd>H</kbd>
+      <span class="sound">f</span>
+    </li>
+    <li data-key="y"
+        class="key black fSharp">
+      <kbd>Y</kbd>
+      <span class="sound high">f&#35;</span>
+    </li>
+    <li data-key="j"
+        class="key white g">
+      <kbd>J</kbd>
+      <span class="sound">g</span>
+    </li>
+    <li data-key="u"
+        class="key black aFlat">
+      <kbd>U</kbd>
+      <span class="sound high">a&#9837;</span>
+    </li>
+    <li data-key="k"
+        class="key white a">
+      <kbd>K</kbd>
+      <span class="sound">a</span>
+    </li>
+    <li data-key="i"
+        class="key black bFlat">
+      <kbd>I</kbd>
+      <span class="sound high">b&#9837;</span>
+    </li>
+    <li data-key="l"
+        class="key white b">
+      <kbd>L</kbd>
+      <span class="sound">b</span>
+    </li>
+    <li data-key=";"
+        class="key white c4">
+      <kbd>;</kbd>
+      <span class="sound">c</span>
+    </li>
+  </ul>
+
+  <audio class="audio"
+         data-key="a"
+         src="piano2/sounds/A2.wav"></audio>
+  <audio class="audio"
+         data-key="s"
+         src="piano2/sounds/B2.wav"></audio>
+  <audio class="audio"
+         data-key="d"
+         src="piano2/sounds/C3.wav"></audio>
+  <audio class="audio"
+         data-key="f"
+         src="piano2/sounds/D3.wav"></audio>
+  <audio class="audio"
+         data-key="g"
+         src="piano2/sounds/E3.wav"></audio>
+  <audio class="audio"
+         data-key="h"
+         src="piano2/sounds/F3.wav"></audio>
+  <audio class="audio"
+         data-key="j"
+         src="piano2/sounds/G3.wav"></audio>
+  <audio class="audio"
+         data-key="k"
+         src="piano2/sounds/A3.wav"></audio>
+  <audio class="audio"
+         data-key="l"
+         src="piano2/sounds/B3.wav"></audio>
+  <audio class="audio"
+         data-key=";"
+         src="piano2/sounds/C4.wav"></audio>
+
+  <audio class="audio"
+         data-key="w"
+         src="piano2/sounds/Bb2.wav"></audio>
+  <audio class="audio"
+         data-key="r"
+         src="piano2/sounds/Db3.wav"></audio>
+  <audio class="audio"
+         data-key="t"
+         src="piano2/sounds/Eb3.wav"></audio>
+  <audio class="audio"
+         data-key="y"
+         src="piano2/sounds/Gb3.wav"></audio>
+  <audio class="audio"
+         data-key="u"
+         src="piano2/sounds/Ab3.wav"></audio>
+  <audio class="audio"
+         data-key="i"
+         src="piano2/sounds/Bb3.wav"></audio>
+
+  <script src="piano2/index.js"></script>
+</body>
+
+</html>

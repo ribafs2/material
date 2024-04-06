@@ -1,0 +1,230 @@
+https://www.mkdocs.org/
+
+sudo apt update
+
+sudo apt install python3-pip -y
+
+pip3 --version
+
+pip3 install --upgrade pip
+
+pip3 install mkdocs
+
+ou
+sudo apt install mkdocs
+
+mkdocs new doc
+
+cd doc
+
+mkdocs serve
+
+http://127.0.0.1:8000/
+
+Arquivo de configuração
+
+mkdocs.yml
+
+site_name: MkLorum
+nav:
+    - Home: index.md
+    - About: about.md
+theme: readthedocs
+
+echo "site/" >> .gitignore
+
+mkdocs build
+
+ou
+
+mkdocs build --clean
+
+Cria a pasta site contendo todo o site doc em HTML
+
+mkdocs build --help
+
+Adicionando página
+
+site_name: MkLorum
+nav:
+    - Home: index.md
+    - About: about.md
+
+Mudando o tema
+
+site_name: MkLorum
+nav:
+    - Home: index.md
+    - About: about.md
+theme: readthedocs
+
+doc/docs
+    index.md
+doc/site
+        /css
+        /fonts
+        /img
+        /js
+        /search
+        404.html
+        index.html
+        sitemap.xml
+        sitemap.xml.gz
+doc/mkdocs.yml
+
+Exemplo do mkdocs.yml do laravel-acl
+
+site_name: ACL to Laravel 8
+theme:
+  name: material
+  favicon: 'img/favicon.ico'
+  palette:
+    primary: 'deep orange'
+markdown_extensions:
+    - codehilite:
+            use_pygments: True
+            linenums: True
+            pygments_style: monokai
+site_name: 'Laravel 8 ACL'
+site_url: https://ribafs.github.io/
+site_description: 'ACL Implementation to Laravel 8'
+site_author: 'Ribamar FS'
+copyright: 'Inteiramente livre'
+extra_css:
+    - css/extra.css
+nav:
+    - Início: index.md
+    - Introdução: introduction.md
+    - Instalação: installation.md
+    - Controllers: controllers.md
+    - Views: views.md 
+    - Rotas: routes.md
+    - Seeders: seeders.md
+    - Middleware: middleware.md
+    - Provider: provider.md
+    - Trait: trait.md
+    - Tinker: tinker.md
+    - Gerenciando: manager.md
+    - Customizações: customizations.md
+    - Testando: testing.md
+    - Erros: errors.md
+    - Documentação: documentation.md
+    - Licença: license.md
+    - Referências: references.md
+    - Créditos: credits.md
+
+pip3 install mkdocs-material
+
+Favicon
+
+Criar pasta img no raiz e copiar para ela o favicon.ico
+
+Temas
+
+https://github.com/mkdocs/mkdocs/wiki/MkDocs-Themes
+
+git clone https://github.com/hfagerlund/mkdocs-docskimmer.git
+
+mkdocs.yml:
+
+nav:
+    ## add your custom pages hierarchy here
+
+theme:
+  name: null
+  custom_dir: 'mkdocs_docskimmer'
+  include_search_page: true
+  search_index_only: false
+  static_templates:
+  - 404.html
+
+plugins: ['search']
+
+# add theme version number here
+extra:
+    version: 0.3.x
+
+
+pip3 install mkdocs-custommill
+
+mkdocs.yml:
+
+theme: custommill
+
+
+pip3 install mkdocs-bootstrap
+
+mkdocs.yml
+
+theme:
+    name: bootstrap
+
+
+pip3 install mkdocs-bootswatch
+
+After installation is complete, edit your mkdocs.yml config file and set the theme to one of the following Bootwatch themes included. The full list is as follows:
+
+    cerulean
+    cosmo
+    cyborg
+    darkly
+    flatly
+    journal
+    litera
+    lumen
+    lux
+    materia
+    minty
+    pulse
+    sandstone
+    simplex
+    slate
+    solar
+    spacelab
+    superhero
+    united
+    yeti
+
+For example:
+
+theme: cerulean
+
+Or:
+
+theme: yeti
+
+pip3 install mkdocs-bootstrap4
+
+mkdocs.yml file and set the theme name to bootstrap4:
+
+theme:
+    name: bootstrap4
+
+
+theme:
+    name: mkdocs
+    highlightjs: true
+    hljs_languages:
+        - yaml
+        - rust
+
+theme:
+    name: mkdocs
+    shortcuts:
+        help: 191    # ?
+        next: 78     # n
+        previous: 80 # p
+        search: 83   # s
+
+- docs/
+  - index.html
+- custom_theme/
+  - img/
+    - favicon.ico
+  - js/
+    - somelib.js
+  - 404.html
+- config.yml
+
+
+    

@@ -1,0 +1,41 @@
+Ferramenta para a Criação de sites para documentação de projetos.
+
+Criação usando o markdown e exportados para HTML estático e assim podemos hospedar no Guthub ou outro semelhante
+
+https://www.mkdocs.org/
+
+sudo apt update
+
+sudo apt install python3-pip -y
+
+pip3 --version
+
+pip3 install --upgrade pip
+
+pip3 install mkdocs
+
+ou
+sudo apt install mkdocs
+
+mkdocs new doc
+
+cd doc
+
+mkdocs serve
+
+http://127.0.0.1:8000/
+
+Arquivo de configuração
+
+mkdocs.yml
+
+site_name: MkLorum
+nav:
+    - Home: index.md
+    - About: about.md
+theme: readthedocs
+
+echo "site/" >> .gitignore
+
+mkdocs build --clean
+

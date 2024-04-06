@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- generator="Joomla! - Open Source Content Management" -->
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+	<channel>
+		<title>Início</title>
+		<description><![CDATA[]]></description>
+		<link>http://backup/materialjs/index.php?view=category&amp;id=2</link>
+		<lastBuildDate>Sat, 06 Apr 2024 17:39:54 +0000</lastBuildDate>
+		<generator>Joomla! - Open Source Content Management</generator>
+		<atom:link rel="self" type="application/rss+xml" href="http://backup/materialjs/materialjs/index.php?view=category&amp;id=2&amp;format=feed&amp;type=rss"/>
+		<language>pt-br</language>
+		<item>
+			<title>Meus livros</title>
+			<link>http://backup/materialjs/index.php/livros2</link>
+			<guid isPermaLink="true">http://backup/materialjs/index.php/livros2</guid>
+			<description><![CDATA[<p> </p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="http://backup/materialjs/images/livros.jpeg" width="250" height="202" /></p>
+<p><a href="http://backup/materialjs/livros" target="_blank" rel="noopener">Livros</a></p>
+<p> </p>]]></description>
+			<category>Genérica</category>
+			<pubDate>Sat, 03 Feb 2024 17:33:31 +0000</pubDate>
+		</item>
+		<item>
+			<title>Ferramentas</title>
+			<link>http://backup/materialjs/index.php/ferramentas</link>
+			<guid isPermaLink="true">http://backup/materialjs/index.php/ferramentas</guid>
+			<description><![CDATA[<p> </p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="http://backup/materialjs/images/ferramentas.jpeg" width="275" height="183" /></p>
+<p><a href="http://backup/materialjs/tools" target="_blank" rel="noopener">Ferramentas</a></p>]]></description>
+			<category>Genérica</category>
+			<pubDate>Sat, 03 Feb 2024 17:32:06 +0000</pubDate>
+		</item>
+		<item>
+			<title>Servidores</title>
+			<link>http://backup/materialjs/index.php/servidores</link>
+			<guid isPermaLink="true">http://backup/materialjs/index.php/servidores</guid>
+			<description><![CDATA[<p> </p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="http://backup/materialjs/images/servidores.jpeg" width="300" height="168" /></p>
+<p><a href="http://backup/materialjs/servidores" target="_blank" rel="noopener">Servidores</a></p>
+<p> </p>]]></description>
+			<category>Genérica</category>
+			<pubDate>Sat, 03 Feb 2024 17:29:32 +0000</pubDate>
+		</item>
+		<item>
+			<title>Programação</title>
+			<link>http://backup/materialjs/index.php/programacao2</link>
+			<guid isPermaLink="true">http://backup/materialjs/index.php/programacao2</guid>
+			<description><![CDATA[<p> </p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="http://backup/materialjs/images/programacao.jpeg" width="299" height="168" /></p>
+<p><a href="http://backup/materialjs/devel" target="_blank" rel="noopener">Maerial sobre programação</a></p>
+<p> </p>
+<p> </p>]]></description>
+			<category>Genérica</category>
+			<pubDate>Sat, 03 Feb 2024 17:27:16 +0000</pubDate>
+		</item>
+		<item>
+			<title>Apoio</title>
+			<link>http://backup/materialjs/index.php/apoio2</link>
+			<guid isPermaLink="true">http://backup/materialjs/index.php/apoio2</guid>
+			<description><![CDATA[<p> </p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="http://backup/materialjs/images/apoio.jpeg" width="275" height="183" /></p>
+<p><a href="http://backup/materialjs/apoio" target="_blank" rel="noopener">Muito material de apoio</a></p>
+<p> </p>
+<p> </p>]]></description>
+			<category>Genérica</category>
+			<pubDate>Sat, 03 Feb 2024 17:24:41 +0000</pubDate>
+		</item>
+		<item>
+			<title>Entrada</title>
+			<link>http://backup/materialjs/index.php</link>
+			<guid isPermaLink="true">http://backup/materialjs/index.php</guid>
+			<description><![CDATA[<p> </p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="http://backup/materialjs/images/programador.jpg" width="840" height="480" /></p>
+<p>Durante alguns anos eu reuni bons tutoriais, dicas e exemplos de código. Passei um bom tempo compartilhando no Github:</p>
+<p><a href="https://github.com/ribafs">https://github.com/ribafs</a></p>
+<p>Mas sinto falta de organizar os assuntos por categoria no Github e agora resolvi guardar e compartilhar por aqui, neste site.</p>
+<p>Boa diversão.</p>
+<p>Fortaleza, 16 de janeiro de 2024</p>
+<p>Ribamar FS</p>
+<p><strong>Algumas das principais pastas:</strong></p>
+<p><strong>Apoio</strong><br />    Apostilas - <a href="http://backup/materialjs/index.php/apoio/6-apostilas">https://material.ribamar.net.br/index.php/apoio/6-apostilas</a> <br />    Estudo - <a href="http://backup/materialjs/index.php/apoio/35-estudo">https://material.ribamar.net.br/index.php/apoio/35-estudo</a> <br />    Trabalho - <a href="http://backup/materialjs/index.php/apoio/39-trabalho">https://material.ribamar.net.br/index.php/apoio/39-trabalho</a> <br /><strong>Programação</strong><br />    HTML - <a href="http://backup/materialjs/index.php/programacao/640-frontend/646-html">https://material.ribamar.net.br/index.php/programacao/640-frontend/646-html</a> <br />    CSS - <a href="http://backup/materialjs/index.php/programacao/640-frontend/641-css">https://material.ribamar.net.br/index.php/programacao/640-frontend/641-css</a> <br />    JavaScript - <a href="http://backup/materialjs/index.php/programacao/640-frontend/649-js">https://material.ribamar.net.br/index.php/programacao/640-frontend/649-js</a> <br />    ReactJS - <a href="http://backup/materialjs/index.php/programacao/640-frontend/650-reac">https://material.ribamar.net.br/index.php/programacao/640-frontend/650-reac</a> <br />    <br />    Matemática em programação - <a href="http://backup/materialjs/index.php/programacao/747-matematica">https://material.ribamar.net.br/index.php/programacao/747-matematica</a> <br />    <br />    AJAX - <a href="http://backup/materialjs/index.php/programacao/47-backend/54-ajax">https://material.ribamar.net.br/index.php/programacao/47-backend/54-ajax</a> <br />    API - <a href="http://backup/materialjs/index.php/programacao/47-backend/58-api">https://material.ribamar.net.br/index.php/programacao/47-backend/58-api</a> <br />    Joomla - <a href="http://backup/materialjs/index.php/programacao/47-backend/63-cms/64-joomla">https://material.ribamar.net.br/index.php/programacao/47-backend/63-cms/64-joomla</a> <br />    CodeIgniter - <a href="http://backup/materialjs/index.php/programacao/47-backend/69-codeigniter">https://material.ribamar.net.br/index.php/programacao/47-backend/69-codeigniter</a> <br />    Laravel - <a href="http://backup/materialjs/index.php/programacao/47-backend/70-laravel">https://material.ribamar.net.br/index.php/programacao/47-backend/70-laravel</a> <br />    NodeJS - <a href="http://backup/materialjs/index.php/programacao/47-backend/71-nodejs">https://material.ribamar.net.br/index.php/programacao/47-backend/71-nodejs</a></p>
+<p><strong>    PHP</strong><br />        Procedural - <a href="http://backup/materialjs/index.php/programacao/47-backend/72-php/73-1procedural">https://material.ribamar.net.br/index.php/programacao/47-backend/72-php/73-1procedural</a> <br />        PHPOO - <a href="http://backup/materialjs/index.php/programacao/47-backend/72-php/76-2phpoo">https://material.ribamar.net.br/index.php/programacao/47-backend/72-php/76-2phpoo</a> <br />        PDO Exemplos - <a href="http://backup/materialjs/index.php/programacao/47-backend/72-php/76-2phpoo">https://material.ribamar.net.br/index.php/programacao/47-backend/72-php/76-2phpoo</a>         CRUDs - <a href="http://backup/materialjs/index.php/programacao/47-backend/72-php/400-cruds">https://material.ribamar.net.br/index.php/programacao/47-backend/72-php/400-cruds</a> <br />    MySQL - <a href="http://backup/materialjs/index.php/programacao/47-backend/622-sgbd/624-mysql">https://material.ribamar.net.br/index.php/programacao/47-backend/622-sgbd/624-mysql</a> <br />    PostgreSQL - <a href="http://backup/materialjs/index.php/programacao/47-backend/622-sgbd/634-postgresql">https://material.ribamar.net.br/index.php/programacao/47-backend/622-sgbd/634-postgresql</a> <br />    SQLite - <a href="http://backup/materialjs/index.php/programacao/47-backend/622-sgbd/635-sqlite">https://material.ribamar.net.br/index.php/programacao/47-backend/622-sgbd/635-sqlite</a> <br />    <br /><strong>    Mobile</strong><br />        Educativos - <a href="http://backup/materialjs/index.php/programacao/751-mobile/752-educativos">https://material.ribamar.net.br/index.php/programacao/751-mobile/752-educativos</a> <br />        GDevelop - <a href="http://backup/materialjs/index.php/programacao/751-mobile/831-gdevelop">https://material.ribamar.net.br/index.php/programacao/751-mobile/831-gdevelop</a> <br />        Monaca - <a href="http://backup/materialjs/index.php/programacao/751-mobile/879-monaca">https://material.ribamar.net.br/index.php/programacao/751-mobile/879-monaca</a> <br />        <br /><strong>Servidores</strong><br />    Linux - <a href="http://backup/materialjs/index.php/servidores/2610-linux">https://material.ribamar.net.br/index.php/servidores/2610-linux</a> <br />    PostgreSQL - <a href="http://backup/materialjs/index.php/servidores/2627-postgresql">https://material.ribamar.net.br/index.php/servidores/2627-postgresql</a> <br />    Segurança - <a href="http://backup/materialjs/index.php/servidores/3024-seguranca">https://material.ribamar.net.br/index.php/servidores/3024-seguranca</a> <br />    Zentyal (infraestrutura) - <a href="http://backup/materialjs/index.php/servidores/3061-zentyal">https://material.ribamar.net.br/index.php/servidores/3061-zentyal</a> <br />    <br /><strong>Ferramentas (diversas) </strong></p>
+<p><a href="http://backup/materialjs/index.php/ferramentas">https://material.ribamar.net.br/index.php/ferramentas</a>     </p>
+<p><strong>Meus Livros (free)</strong></p>
+<p><a href="http://backup/materialjs/index.php/livros">https://material.ribamar.net.br/index.php/livros</a></p>
+<p> </p>]]></description>
+			<category>Genérica</category>
+			<pubDate>Tue, 16 Jan 2024 16:02:50 +0000</pubDate>
+		</item>
+	</channel>
+</rss>

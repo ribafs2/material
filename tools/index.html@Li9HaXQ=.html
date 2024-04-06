@@ -1,0 +1,712 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../tools.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Remover diret&oacute;rio existente num reposit&oacute;rio remoto do GitHub
+
+Suponha que quero remover do reposit&oacute;rio &quot;tutoriais&quot; a pasta mini-mvc7, que est&aacute; dentro da 6PHPOO/MVC, ou seja,
+6PHPOO/MVC/mini-mvc7
+
+Clone o reposit&oacute;rio
+git clone git@github.com:riba</pre>'><a href='Git/RemoverFolder.txt'><img src='Git/index.html@i=text'/> RemoverFolder.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>382B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Tenho um reposit&oacute;rio no GitHub com v&aacute;rios arquivos e pastas
+
+Ent&atilde;o pretendo enviar uma pasta para o reposit&oacute;rio
+
+Como proceder?
+
+Exemplo
+
+- Clonar o reposit&oacute;rio localmente
+- Acessar o terminal
+- git clone git@github.com:ribafs/tutoriais.git
+- cd</pre>'><a href='Git/EnviarPastaRepo.txt'><img src='Git/index.html@i=text'/> EnviarPastaRepo.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>330B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/RemoverPastaRemoto.html'><img src='Git/index.html@i=file'/> RemoverPastaRemoto</a></td>
+                                                
+                                <td>File</td>
+                                <td>0B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Qualquer pessoa que faz um coment&aacute;rio ou cria um Issue ou um pull request &eacute; um colaborador do projeto.
+
+Adicionar os nomes dos colaboradores ao:
+README.md
+Contributors.md
+
+Adicionar seus nomes ao site do projeto com um pequeno curr&iacute;culo.
+
+Deixar o</pre>'><a href='Git/Lideranca.txt'><img src='Git/index.html@i=text'/> Lideranca.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>827B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/ProjetosGit.md'><img src='Git/index.html@i=file'/> ProjetosGit.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.71KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/GitHub_Packagist.html'><img src='Git/index.html@i=file'/> GitHub_Packagist</a></td>
+                                                
+                                <td>File</td>
+                                <td>429B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/git-clear.html'><img src='Git/index.html@i=file'/> git-clear</a></td>
+                                                
+                                <td>File</td>
+                                <td>76B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Enviar arquivos para o GitHub
+
+1 - Enviar sua chave SSH do seu desktop para o GitHub
+
+Ap&oacute;s criar sua conta no GitHub
+Acessar e clicar em seu avatar no canto direito superior
+Settings
+SSH and GPG Keys
+New SSH key
+Digite um T&iacute;tulo
+Clique na caixa Key</pre>'><a href='Git/EnviarGitHub.txt'><img src='Git/index.html@i=text'/> EnviarGitHub.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.16KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/Git&#32;tut.html'><img src='Git/index.html@i=file'/> Git tut</a></td>
+                                                
+                                <td>File</td>
+                                <td>460B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/git-dicas.md'><img src='Git/index.html@i=file'/> git-dicas.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>519B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/git.html'><img src='Git/index.html@i=file'/> git</a></td>
+                                                
+                                <td>File</td>
+                                <td>488B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/PackagistMirror.html'><img src='Git/index.html@i=file'/> PackagistMirror</a></td>
+                                                
+                                <td>File</td>
+                                <td>196B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/ChaveSSH.md'><img src='Git/index.html@i=file'/> ChaveSSH.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>83B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Git
+I have the following setup of an app I am working on, and I would like to host the app on github using gh-pages. here I hope to achieve this.
+
+UserName@PC1 ~/GitHub/ud989-retain
+$ ls
+css  index.html  js
+
+UserName@PC1 ~/GitHub/ud989-retain
+$ git s</pre>'><a href='Git/Git.txt'><img src='Git/index.html@i=text'/> Git.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.95KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/Lideranca.md'><img src='Git/index.html@i=file'/> Lideranca.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>830B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/index.php.html'><img src='Git/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 12:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/BannerGH.md'><img src='Git/index.html@i=file'/> BannerGH.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>383B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/readme-template-main.zip'><img src='Git/index.html@i=compressed'/> readme-template-main.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>60.07KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/style.class.php.html'><img src='Git/index.html@i=file'/> style.class.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.21KB</td>
+                                <td>2024-02-03 04:31:56</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Auto-crud
+
+Criador Autom&aacute;tico de CRUDs com PDO
+
+GitHub
+https://github.com/auto-crud/auto-crud
+
+Packagist
+https://packagist.org/packages/auto-crud/auto-crud
+
+Recursos ativos:
+
+
+Discuss&otilde;es importantes:
+
+- Ter uma vers&atilde;o bem localizada, de forma que </pre>'><a href='Git/auto-crud.txt'><img src='Git/index.html@i=text'/> auto-crud.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.64KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/Versionando&#32;seu&#32;projeto.docx'><img src='Git/index.html@i=file'/> Versionando seu projeto.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.27KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/CriacaodeChave.html'><img src='Git/index.html@i=file'/> CriacaodeChave</a></td>
+                                                
+                                <td>File</td>
+                                <td>0B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/Git.md'><img src='Git/index.html@i=file'/> Git.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.75KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/ChaveSSH.html'><img src='Git/index.html@i=file'/> ChaveSSH</a></td>
+                                                
+                                <td>File</td>
+                                <td>36B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/gitignore.html'><img src='Git/index.html@i=file'/> gitignore</a></td>
+                                                
+                                <td>File</td>
+                                <td>101B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Como Criar um Projeto hospedado no GitHub e no Packagist
+
+Ainda tem um terceiro projeto envolvido, o Composer.
+O Composer funciona de forma transparente entre ambos, usado pelo Packagist.
+
+Criando um arquivo compojer.json
+
+Projeto em PHP na dobradinh</pre>'><a href='Git/ProjetoGitHubePackagist.txt'><img src='Git/index.html@i=text'/> ProjetoGitHubePackagist.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.38KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/Advanced&#32;Git&#32;tutorial.odt'><img src='Git/index.html@i=file'/> Advanced Git tutorial.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>949.63KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/Referencias.html'><img src='Git/index.html@i=file'/> Referencias</a></td>
+                                                
+                                <td>File</td>
+                                <td>105B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/Apontar&#32;domÃÂ­nio&#32;para&#32;o&#32;GitHub.html'><img src='Git/index.html@i=file'/> Apontar domÃÂ­nio para o GitHub</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.06KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Configura&ccedil;&atilde;o do VSCode com Git
+https://www.youtube.com/watch?v=QJWP4z3FHhM
+
+Instalar git na m&aacute;quina
+sudo apt-get install git
+ou https://git-scm.com/
+
+Criar reposit&oacute;rio &quot;testando&quot; no GitHub ou GitLab
+Com apenas o readme e a licen&ccedil;a para clonar el</pre>'><a href='Git/ConfiguraÃÂ§ÃÂ£o&#32;do&#32;VSCode&#32;com&#32;Git.txt'><img src='Git/index.html@i=text'/> ConfiguraÃÂ§ÃÂ£o do VSCode com Git.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.5KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/Dicas.md'><img src='Git/index.html@i=file'/> Dicas.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>166B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Remover diret&oacute;rio existente num reposit&oacute;rio remoto do GitHub
+
+Suponha que quero remover do reposit&oacute;rio &quot;tutoriais&quot; a pasta mini-mvc7, que est&aacute; dentro da 6PHPOO/MVC, ou seja,
+6PHPOO/MVC/mini-mvc7
+
+Quero remover a pasta teste do repositorio chamado</pre>'><a href='Git/RemoverPastaRemota.txt'><img src='Git/index.html@i=text'/> RemoverPastaRemota.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>498B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/GitGitlab.html'><img src='Git/index.html@i=file'/> GitGitlab</a></td>
+                                                
+                                <td>File</td>
+                                <td>483B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>GitHub
+
+O GitHub &eacute; uma plataforma de hospedagem de c&oacute;digo para controle de vers&atilde;o/git e colabora&ccedil;&atilde;o. 
+
+Ent&atilde;o uma &Oacute;TIMA maneira de se praticar &eacute; auxiliando projetos no Github.
+
+Contribuir com Open Source realmente pode mudar sua perspectiva.
+V</pre>'><a href='Git/ProjetosOpenSource.txt'><img src='Git/index.html@i=text'/> ProjetosOpenSource.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.85KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/Versionamento&#32;de&#32;projetos.html'><img src='Git/index.html@i=file'/> Versionamento de projetos</a></td>
+                                                
+                                <td>File</td>
+                                <td>421B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/ProjetosOpenSource.md'><img src='Git/index.html@i=file'/> ProjetosOpenSource.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.56KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/ClonarRepo.html'><img src='Git/index.html@i=file'/> ClonarRepo</a></td>
+                                                
+                                <td>File</td>
+                                <td>0B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/ApontarDomÃÂ­nioGitHub.md'><img src='Git/index.html@i=file'/> ApontarDomÃÂ­nioGitHub.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>836B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Git/LimparCache.md'><img src='Git/index.html@i=file'/> LimparCache.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>126B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

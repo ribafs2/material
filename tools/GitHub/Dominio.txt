@@ -1,0 +1,21 @@
+Domínio ribafs.me no Hostgator apontando para o GitHub
+
+blog.ribafs.me	ribafs.github.io
+www.ribafs.me	ribafs.github.io
+ribafs.me	185.199.111.153
+ribafs.me	185.199.110.153
+ribafs.me	185.199.109.153
+ribafs.me	185.199.108.153
+
+
+Criar o arquivo
+
+CNAME
+
+Contendo
+
+ribafs.me
+
+No raiz do repositório ribafs.github.io
+
+

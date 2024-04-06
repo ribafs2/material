@@ -1,0 +1,27 @@
+install Monaca CLI
+
+sudo npm install -g monaca
+
+monaca login                  // login with your new account
+
+Criar app
+
+monaca create ola
+
+escolha
+
+roject is created successfully.
+
+Type "cd ola" and run monaca command again.
+  > monaca preview      => Run app in the browser
+  > monaca debug        => Run app in the device using Monaca Debugger
+  > monaca remote build => Start remote build for iOS/Android/Windows
+  > monaca upload       => Upload this project to Monaca Cloud IDE
+
+cd ola
+
+Instalar o Monaca Debugger no celulas
+
+monaca debug
+
+

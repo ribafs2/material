@@ -1,0 +1,50 @@
+Ferramenas
+
+Laravel
+https://github.com/ribafs/acl-laravel
+https://github.com/ribafs/laravel-acl
+skeleon - https://github.com/ribafs/laravel-skeleton
+https://github.com/ribafs/laravel-pt-BR-localization
+https://github.com/ribafs/laravel-best-practices
+Subs
+commands
+https://github.com/pstephan1187/laravel-tools
+
+PHP
+Relatorios com Koolreport - https://www.koolreport.com/ - https://github.com/ribafs/reports - https://github.com/ribafs/report-generator
+faker - https://github.com/ribafs/faker-br - https://github.com/caius/php-faker - https://github.com/ribafs/FakerRestaurantPHP
+filemanager - https://tinyfilemanager.github.io/
+Unzipper - https://github.com/ndeet/unzipper
+https://github.com/ribafs/pix-php
+https://github.com/ribafs/security-checker
+https://github.com/ribafs/db-exporter
+https://www.phpmyfaq.de/
+https://osticket.com/
+https://github.com/mattanja/automysqlbackup
+hmlediores
+https://github.com/diamond95/LiveChat
+
+JS
+https://github.com/ribafs/cep-busca
+https://ribafs.github.io/digital-clock-js/
+https://github.com/ribafs/calculadora-neumorphic
+https://ribafs.github.io/despertador
+https://ribafs.github.io/cronometro-js/
+https://github.com/ribafs/juros-compostos
+https://ribafs.github.io/keyboard/
+https://e-calendar.vercel.app/ - https://github.com/muzhaqi16/eCalendar
+https://github.com/ribafs/sqlite-web - https://ribafs.github.io/sqlite-web/
+https://github.com/ribafs/csv-generator
+
+DevOps
+Cipi - vps admin em laravel
+https://github.com/ribafs/cyberpanel - painel vps opensource
+https://github.com/ribafs/seguranca
+
+Ouras
+MkDocs - sites/blogs - https://github.com/ribafs/mkdocs
+Cubic remaster Ubunu/Min - 
+https://github.com/ribafs/web-share
+https://github.com/ribafs/QuantoCobrarPorSite
+
+

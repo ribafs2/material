@@ -1,0 +1,15 @@
+    .centro{
+      font-size: 300px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      min-height: 50vh;
+      margin-left: 400px;
+      margin-right: 400px;
+    }
+    h1{
+        text-align:center;
+        color: #0000FF;
+    }
+

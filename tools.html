@@ -1,0 +1,884 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='index.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='tools/Extenso.zip'><img src='tools/index.html@i=compressed'/> Extenso.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>18.31KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+
+TinyMCE - https://www.tiny.cloud/get-tiny
+
+CKEditor - https://ckeditor.com/ckeditor-4/download/
+
+Summernote - https://summernote.org/getting-started/
+
+Ace - https://ace.c9.io/ - Highlight para mais de 110 linguagens
+
+Markup - http://markitup.jaysal</pre>'><a href='tools/EditoresHTML..txt'><img src='tools/index.html@i=text'/> EditoresHTML..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>364B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/CriacaoAplicativos_&#32;PHP.odt'><img src='tools/index.html@i=file'/> CriacaoAplicativos_ PHP.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>872.85KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='tools/index.html@Li9Db21wb3Nlcg==.html'><img src='tools/index.html@i=folder'/> Composer</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 01:17:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Ferramenas
+
+Laravel
+https://github.com/ribafs/acl-laravel
+https://github.com/ribafs/laravel-acl
+skeleon - https://github.com/ribafs/laravel-skeleton
+https://github.com/ribafs/laravel-pt-BR-localization
+https://github.com/ribafs/laravel-best-practices</pre>'><a href='tools/Tools..txt'><img src='tools/index.html@i=text'/> Tools..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.67KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/osTicket.html'><img src='tools/index.html@i=file'/> osTicket</a></td>
+                                                
+                                <td>File</td>
+                                <td>33B</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Extens&atilde;o para Copiar Texto de V&iacute;deo
+
+Recebi esta dica em um grupo do Facebook, PHP Brasil acho. Como parece algo &uacute;til venho compartilhar por aqui para que facilmente possa alcan&ccedil;ar mais gente.
+
+Algumas vezes estamos acompanhando uma v&iacute;deo &aacute;ul</pre>'><a href='tools/copiar-texto-de-video.txt'><img src='tools/index.html@i=text'/> copiar-texto-de-video.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.13KB</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+https://github.com/ribafs/tinyfilemanager
+
+https://tinyfilemanager.github.io/
+</pre>'><a href='tools/FileManagers..txt'><img src='tools/index.html@i=text'/> FileManagers..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>79B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>-assets
+-Composer
+-DownloadSite
+-Email
+-Htaccess
+-MkDocs
+-unicode
+-VSCode
+-Calendarios.zip
+-Captchas.zip
+-Chats.zip
+-ckeditor-php-pdo-insert.zip
+-copiar-texto-de-video.md
+-CriacaoAplicativos_ PHP.odt
+-CriacaoAplicativos_ PHP.pdf
+-crop_image.php
+-Data</pre>'><a href='tools/1Tools.txt'><img src='tools/index.html@i=text'/> 1Tools.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>831B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/tinyfilemanager-master.zip'><img src='tools/index.html@i=compressed'/> tinyfilemanager-master.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>2.48MB</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Sort-columns.zip'><img src='tools/index.html@i=compressed'/> Sort-columns.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>91.31KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/grid-editable.zip'><img src='tools/index.html@i=compressed'/> grid-editable.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>44.94KB</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='tools/index.html@Li9WU0NvZGU=.html'><img src='tools/index.html@i=folder'/> VSCode</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 01:18:12</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='tools/index.html@Li9WYWdyYW50.html'><img src='tools/index.html@i=folder'/> Vagrant</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 01:18:06</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/VideoEdicao.html'><img src='tools/index.html@i=file'/> VideoEdicao</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.9KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/php_testecpf.zip'><img src='tools/index.html@i=compressed'/> php_testecpf.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>5.29KB</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Nocode.html'><img src='tools/index.html@i=file'/> Nocode</a></td>
+                                                
+                                <td>File</td>
+                                <td>167B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Datatables.zip'><img src='tools/index.html@i=compressed'/> Datatables.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>7.63MB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/doctrine.zip'><img src='tools/index.html@i=compressed'/> doctrine.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>6.43MB</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Wget.zip'><img src='tools/index.html@i=compressed'/> Wget.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>1.55KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/ckeditor-php-pdo-insert.zip'><img src='tools/index.html@i=compressed'/> ckeditor-php-pdo-insert.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>1.27MB</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Captchas.zip'><img src='tools/index.html@i=compressed'/> Captchas.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>45.49KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Calendarios.zip'><img src='tools/index.html@i=compressed'/> Calendarios.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>221.41KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># web-share
+
+Pequeno ambiente para compartilhar seu servidor web atrav&eacute;s do Ngrok.
+Para executar o fileman e o unzziper precisar&aacute; copiar para seu diret&oacute;rio web com suporte ao PHP
+
+Uma boa provid&ecirc;ncia para refor&ccedil;ar a seguran&ccedil;a &eacute; ativar o firewa</pre>'><a href='tools/web-share..txt'><img src='tools/index.html@i=text'/> web-share..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.54KB</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/OBSStudio.html'><img src='tools/index.html@i=file'/> OBSStudio</a></td>
+                                                
+                                <td>File</td>
+                                <td>901B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Login.zip'><img src='tools/index.html@i=compressed'/> Login.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>1.93MB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Validacoes.zip'><img src='tools/index.html@i=compressed'/> Validacoes.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>9.83KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/index.php.html'><img src='tools/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 12:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/StackOverflow_Dicas.html'><img src='tools/index.html@i=file'/> StackOverflow_Dicas</a></td>
+                                                
+                                <td>File</td>
+                                <td>390B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/simplest-translator-main.zip'><img src='tools/index.html@i=compressed'/> simplest-translator-main.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>2.25KB</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>http://www.jquery-bootgrid.com/
+https://jqueryhouse.com/20-best-jquery-filter-and-sort-plugins/
+http://tinysort.sjeiti.com/index.html
+https://www.phpgrid.org/
+https://www.js-tutorials.com/javascript-tutorial/jquery-plugins/best-free-jquery-table-plug</pre>'><a href='tools/GridEditavel..txt'><img src='tools/index.html@i=text'/> GridEditavel..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>504B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Upload.zip'><img src='tools/index.html@i=compressed'/> Upload.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>661B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/CriacaoAplicativos_&#32;PHP.pdf'><img src='tools/index.html@i=file'/> CriacaoAplicativos_ PHP.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>739.12KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='tools/index.html@Li9Eb3dubG9hZFNpdGU=.html'><img src='tools/index.html@i=folder'/> DownloadSite</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 01:17:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Relatorios.zip'><img src='tools/index.html@i=compressed'/> Relatorios.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>10.14MB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://www.hostinger.com/tutorials/best-forum-software
+</pre>'><a href='tools/Forums.txt'><img src='tools/index.html@i=text'/> Forums.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>56B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/style.class.php.html'><img src='tools/index.html@i=file'/> style.class.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.21KB</td>
+                                <td>2024-02-03 04:31:56</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='tools/index.html@Li9FbWFpbA==.html'><img src='tools/index.html@i=folder'/> Email</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 01:17:36</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/directory-lister.zip'><img src='tools/index.html@i=compressed'/> directory-lister.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>101.37KB</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/crop_image.php.html'><img src='tools/index.html@i=file'/> crop_image.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>642B</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='tools/index.html@Li9HaXRIdWI=.html'><img src='tools/index.html@i=folder'/> GitHub</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 01:17:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/rock-paper-scissors-php-cli-master.zip'><img src='tools/index.html@i=compressed'/> rock-paper-scissors-php-cli-master.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>10.52KB</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Recursos.html'><img src='tools/index.html@i=file'/> Recursos</a></td>
+                                                
+                                <td>File</td>
+                                <td>105B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Chats.zip'><img src='tools/index.html@i=compressed'/> Chats.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>1.03MB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='tools/index.html@Li9HaXQ=.html'><img src='tools/index.html@i=folder'/> Git</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 01:17:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+
+Hamburger - http://codepen.io/sergioandrade/pen/onkub
+
+IOS - http://codepen.io/jasonhowmans/pen/dykhL
+</pre>'><a href='tools/MenuHamburger..txt'><img src='tools/index.html@i=text'/> MenuHamburger..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>104B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Download.html'><img src='tools/index.html@i=file'/> Download</a></td>
+                                                
+                                <td>File</td>
+                                <td>995B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Generate&#32;Apis.odt'><img src='tools/index.html@i=file'/> Generate Apis.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>33.49KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/PDFEditavel.zip'><img src='tools/index.html@i=compressed'/> PDFEditavel.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>255.21KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Download
+
+&Oacute;timo Gerenciador para v&aacute;rios SGBDs
+
+Em apenas um &uacute;nico arquivo PHP:
+
+https://adminer.org
+
+
+https://github.com/PHPOffice/PhpSpreadsheet
+
+https://github.com/PHPOffice/PHPWord
+
+
+Online
+
+Canva - Apresenta&ccedil;&otilde;es, Capa de livro e de e-book, V</pre>'><a href='tools/Ferramentas..txt'><img src='tools/index.html@i=text'/> Ferramentas..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>391B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/ProgOnline.html'><img src='tools/index.html@i=file'/> ProgOnline</a></td>
+                                                
+                                <td>File</td>
+                                <td>791B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='tools/index.html@Li9Na0RvY3M=.html'><img src='tools/index.html@i=folder'/> MkDocs</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 01:17:58</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/RegEx.zip'><img src='tools/index.html@i=compressed'/> RegEx.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>2.15MB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/unzipper-master.zip'><img src='tools/index.html@i=compressed'/> unzipper-master.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>17.07KB</td>
+                                <td>2024-02-03 03:21:38</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tools/Migrations.zip'><img src='tools/index.html@i=compressed'/> Migrations.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>108.83KB</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='tools/index.html@Li91bmljb2Rl.html'><img src='tools/index.html@i=folder'/> unicode</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 01:18:02</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&Oacute;timo CPS em PHP para cadastro de FAQs
+
+https://www.phpmyfaq.de/download
+
+git clone git://github.com/thorsten/phpMyFAQ.git
+
+Descompactar e chamar no diret&oacute;rio web
+
+phpmyfaq
+
+Criar o banco e seguir as instru&ccedil;&otilde;es.
+
+Ao final chame pelo navegador
+
+Si</pre>'><a href='tools/PHPMyFAQ..txt'><img src='tools/index.html@i=text'/> PHPMyFAQ..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>321B</td>
+                                <td>2024-02-03 03:21:30</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='tools/index.html@Li9IdGFjY2Vzcw==.html'><img src='tools/index.html@i=folder'/> Htaccess</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 01:17:52</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

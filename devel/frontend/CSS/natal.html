@@ -1,0 +1,81 @@
+<html>
+<head></head>
+<body>
+<style type="text/css">
+div span{display: block; margin-top: 4px; text-align: center;}
+div{
+width:100%;
+height:100%;
+background: #ff0;
+background-image: url(http://backup/materialjs/devel/frontend/CSS/gra.png);
+background-image: -moz-lenear-gradient­(red 30%, blue);
+background-image: -webkit-linear-gradi­ent(red 30%, blue );
+background-image: -o-linear-gradient(r­ed 30% , blue );
+}
+@-webkit-keyframes rodaroda {
+25% {
+color:#E50914;
+-webkit-transform:ro­tate(0deg);
+}
+50% {
+color:#FFCC00;
+-webkit-transform:ro­tate(0deg);
+}
+75% {
+color:#3B5998;
+-webkit-transform:ro­tate(0deg);
+}
+100%{
+color: #7CBB00;
+-webkit-transform:ro­tate(0deg);
+}
+}
+div{
+width:100%;
+height:200%;
+background:black;
+-webkit-animation: rodaroda 0.5s linear infinite alternate;
+/* rodaroda --> é o nome da função*/
+/* 3s é o tempo da rotação. vc pode aumentar ou diminuir*/
+}
+</style>
+<?php
+class natal
+{
+public function arvore()
+{?>
+<div>
+<br>
+<span>*</span>
+<span>**</span>
+<span>***</span>
+<span>****</span>
+<span>*****</span>
+<span>******</span>
+<span>*******</span>
+<span>*******</span>
+<span>********</­span>
+<span>*********</­span>
+<span>**********</­span>
+<span>************
+<span>*************
+<span>**************­***</span>
+<span>**************­*****</span>
+<span>**************­******</span>
+<span>**************­*********</span>
+<span>**************­**********</span>
+<span>**************­*************</span>
+<span>**************­***************
+<span>**************­*******************
+<span>**************­********************­*</span>
+<span>**************­********************­***</span>
+<span>**************­********************­*****</span>
+<span>**************­********************­******</span>
+</div>
+<?php
+}
+}
+?>
+<?php
+$natal = new natal;
+$natal->arvore();

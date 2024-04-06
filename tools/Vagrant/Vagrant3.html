@@ -1,0 +1,56 @@
+Bom para testar estes softwares sem precisar contratar um VPS
+
+Instalação
+
+- VritualBox e Extension Pack - https://www.virtualbox.org/wiki/Downloads
+- Git - https://git-scm.com/ ou sudo apt install git
+- Vagrant - https://www.vagrantup.com/downloads
+
+Criar uma box/vm
+
+Pesquisar aqui - https://app.vagrantup.com/boxes/search
+
+Exemplo: Ubuntu 20.04 do Bento
+Clica no link e depois em New para instalar a versão para Virtualbox
+
+vagrant init bento/ubuntu-20.04
+vagrant up
+
+Criar uma pasta (Eu crio vagrant em minha home)
+vagrant/ub2004
+
+cd ub2004
+Executar
+
+vagrant init bento/ubuntu-20.04
+
+Depois que baixa este script, edito e descomento a linha:
+  config.vm.network "private_network", ip: "192.168.33.10"
+
+Para ficar acessando a box através do IP 192.168.33.10
+
+Lembre que se instalar também outra box, não pode usar o mesmo IP. Eu mudo o acima para 192.168.33.20, p.e.
+
+Então executo
+
+vagrant up
+
+Esta parte demora um pouco, pois baixará e instalará a distribuição
+
+Após finalizar acesso o shell da distro na box com:
+
+vagrant ssh
+
+Pronto, estou no terminal, com o Ubuntu Server 20.04
+
+Sair do terminal do Varant
+exit
+
+Parar a box
+vagrant halt
+
+Destruindo uma box, caso haja algum problema irreparável ou não mais a queiramos
+cd ub2004
+vagrant destroy
+
+
