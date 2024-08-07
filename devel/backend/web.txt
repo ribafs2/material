@@ -1,0 +1,5 @@
+navegador - apache - php - banco de dados - php - apache - navegador
+
+Quando a requisição chega ao apache, ele verifica e se for apenas hml ele devolve sem processar, se for php ele passa para o inerpreador de php, que processa devidamene e devolve o resulado para o apache, que devolve para o navegador.
+
+

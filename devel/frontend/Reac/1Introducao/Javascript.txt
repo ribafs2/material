@@ -1,0 +1,12 @@
+Conhecimmento avançado para React
+
+- Variables
+- Arrow functions
+- Objects and arrays
+- Objects and arrays destructions
+- Template literals
+- Classes
+- Callbacks
+- ES Modules
+
+

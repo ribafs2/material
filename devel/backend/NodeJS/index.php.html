@@ -1,0 +1,496 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../../index.php@Li9iYWNrZW5k.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='curso-nodejs-main.zip'><img src='index.php@i=compressed'/> curso-nodejs-main.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>3.54MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='crud-nodejs-mysql-master.zip'><img src='index.php@i=compressed'/> crud-nodejs-mysql-master.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>28.39KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://nodejs.org/en/
+
+Ubuntu /  Mint 20
+
+Node.js v15.x:
+
+# Using Ubuntu
+curl -sL https://deb.nodesource.com/setup_15.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Using Debian, as root
+curl -sL https://deb.nodesource.com/setup_15.x | bash -
+</pre>'><a href='install.txt'><img src='index.php@i=text'/> install.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>510B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>sudo npm install yarn -g
+</pre>'><a href='yarn.txt'><img src='index.php@i=text'/> yarn.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>25B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='nodejs-mysql-crud-bootstrap-main.zip'><img src='index.php@i=compressed'/> nodejs-mysql-crud-bootstrap-main.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>3.3MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Instala&ccedil;&atilde;o do node
+
+# Using Ubuntu vers&atilde;o 12
+curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Using Ubuntu vers&atilde;o 10
+curl -sL https://deb.nodesource.com/setup_10.x | sudo -E bash -
+sudo apt-get install</pre>'><a href='npm-dicas.txt'><img src='index.php@i=text'/> npm-dicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>651B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='adminjs-master.zip'><img src='index.php@i=compressed'/> adminjs-master.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>2.46MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Curso gratuito do https://rocketseat.com.br - NodeJS
+https://rocketseat.com.br/starter/curso-gratuito-nodejs
+
+Criar uma API REST com NodeJS
+
+Instalar o NodeJS
+
+Criar uma pasta
+mkdir node-api
+cd node-api
+
+Executar para criar um package.json b&aacute;sico
+np</pre>'><a href='tutorial.txt'><img src='index.php@i=text'/> tutorial.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.06KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='node-mysql-crud-api-master.zip'><img src='index.php@i=compressed'/> node-mysql-crud-api-master.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>11.91KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='crud-bootstrap-mysql-nodejs-master.zip'><img src='index.php@i=compressed'/> crud-bootstrap-mysql-nodejs-master.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>3.24MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='index.php.html'><img src='index.php@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='simple-nodejs-mysql-crud-master.zip'><img src='index.php@i=compressed'/> simple-nodejs-mysql-crud-master.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>431.63KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='node-skeleton-mvc-master.zip'><img src='index.php@i=compressed'/> node-skeleton-mvc-master.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>73.93KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='nodejs-crud-with-expressjs-mysql-master.zip'><img src='index.php@i=compressed'/> nodejs-crud-with-expressjs-mysql-master.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>15.94KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>NVM dicas
+
+nvm use 10.15.3
+
+Ele passar&aacute; a usar a vers&atilde;o 10.15.3 do node. Caso n&atilde;o encontre instalar&aacute;
+
+
+Criar package.json
+
+npm init
+
+nano .nvmrc
+
+10.15.3
+
+nvm use # j&aacute; pega a vers&atilde;o do .nvmrc
+
+.gitignore
+
+node_modules
+
+nodemon - d&aacute; reload auto</pre>'><a href='NVM&#32;dicas.txt'><img src='index.php@i=text'/> NVM dicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.18KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='nodejs-main.zip'><img src='index.php@i=compressed'/> nodejs-main.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>5.18MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='node-mysql-crud-app-master.zip'><img src='index.php@i=compressed'/> node-mysql-crud-app-master.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>285.91KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>## 4.2 - Introdu&ccedil;&atilde;o ao NodeJS
+
+Apenas revendo os comandos necess&aacute;rios para usar o NPM no Laravel e mais alguns e a instala&ccedil;&atilde;o do node.
+
+Atualmente o NodeJS &eacute; bem popular. Especialmente por conta do seu gerenciador de pacotes, o NPM, que entrega</pre>'><a href='NodeJS.txt'><img src='index.php@i=text'/> NodeJS.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.07KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

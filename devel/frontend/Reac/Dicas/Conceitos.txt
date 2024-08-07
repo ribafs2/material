@@ -1,0 +1,8 @@
+ReactJS - Styling
+In general, React allows component to be styled using CSS class through className attribute. Since, the React JSX supports JavaScript expression, a lot of common CSS methodology can be used. Some of the top options are as follows −
+    • CSS stylesheet − Normal CSS styles along with className
+    • Inline styling − CSS styles as JavaScript objects along with camelCase properties.
+    • CSS Modules − Locally scoped CSS styles.
+    • Styled component − Component level styles.
+    • Sass stylesheet − Supports Sass based CSS styles by converting the styles to normal css at build time.
+    • Post processing stylesheet − Supports Post processing styles by converting the styles to normal css at build time.

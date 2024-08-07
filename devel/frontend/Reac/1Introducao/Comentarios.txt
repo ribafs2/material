@@ -1,0 +1,47 @@
+JSX
+
+<div className="dropdown">
+    {/* Aqui comentário */}
+
+{/* Aqui comentário
+multi
+line
+ */}
+
+return (
+  <div>
+    <div>
+      {
+        // Your comment goes in here.
+      }
+    </div>
+    {
+      // Note that comments using this style must be wrapped in curly braces!
+    }
+  </div>
+);
+
+render () {
+    return <DeleteResourceButton
+            {/* Confirm */}
+            onDelete = {this.onDelete.bind(this)}
+            message = "This file will be deleted from the server."
+           />
+}
+
+(
+  <div>
+    {/* <h1>Valid comment</h1> */}
+  </div>
+)
+
+
+render() {
+  return (
+    <div>
+      <!-- Isto não funciona! -->
+    </div>
+  )
+}
+
+

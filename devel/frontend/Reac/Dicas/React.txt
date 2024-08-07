@@ -1,0 +1,11 @@
+O React, resumidamente, é uma biblioteca para construção de interfaces, muito utilizado em Single Page Applications (SPA),
+
+Sim, o HTML, CSS, comportamentos…toda a interface é codificada usando somente JavaScript.
+
+A primeira vantagem é a organização do código. O React segue muito forte o conceito de componentização
+
+Outra vantagem é divisão de responsabilidades.
+
+A última vantagem que eu gostaria de citar é a possibilidade aceitar múltiplos clientes.
+
+

@@ -1,0 +1,5 @@
+import logo from './logo.svg'
+
+No JSX
+
+<img src={logo} class='App-logo' alt='logo' />

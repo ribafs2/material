@@ -1,0 +1,577 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+        
+<style>
+a:link {
+  color: red;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: green;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: black;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+a:active {
+  color: yellow;
+  background-color: transparent;
+  text-decoration: underline;
+}
+</style>         
+	</head>
+    <body style="font-size: 15px;">
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li9QSFA=.html'>Ribamar FS - Material Bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='1Procedural/2Exercicios.zip'><img src='1Procedural/index.html@i=compressed'/> 2Exercicios.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>110.32KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='1Procedural/DataHora.zip'><img src='1Procedural/index.html@i=compressed'/> DataHora.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>63.78KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>C&oacute;digo das Linguagens
+01. SHELL SCRIPT vim sh.sh
+
+for i in {1..1000000};
+  do
+    echo -en &quot;${i}Ok\r&quot;
+done
+
+    Rodar: sh sh.sh
+    Testar: time sh sh.sh
+
+02. PHP vim php.php
+
+&lt;?php
+
+for( $i = 0; $i &lt;= 1000000; $i++ ){
+  echo &quot;{$i}Ok\r&quot;;
+}
+
+    Roda</pre>'><a href='1Procedural/Performance.txt'><img src='1Procedural/index.html@i=text'/> Performance.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.81KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='1Procedural/Erros.zip'><img src='1Procedural/index.html@i=compressed'/> Erros.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>9.74MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='1Procedural/Session.zip'><img src='1Procedural/index.html@i=compressed'/> Session.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>3.25KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Refer&ecirc;ncias sobre PHP
+
+- 25 anos de PHP com Rasmus Lerdorf - https://www.youtube.com/watch?v=Qa_xVjTiOUw&amp;feature=emb_err_woyt
+
+https://www.w3schools.com/php/
+
+https://www.w3schools.com/php7/default.asp
+
+https://www.tutorialspoint.com/php/
+
+https:/</pre>'><a href='1Procedural/Referencias.txt'><img src='1Procedural/index.html@i=text'/> Referencias.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>916B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Como desabilitar as mensagens NOTICE no PHP
+
+Caso tenha acesso ao php.ini
+
+display_errors = 0
+
+error_reporting = E_ALL &amp; ~E_NOTICE
+
+Via c&oacute;digo
+
+&lt;?php
+    error_reporting(0);
+?&gt;
+
+&lt;?php
+
+// Report simple running errors
+error_reporting(E_ERROR | E_WARN</pre>'><a href='1Procedural/php.ini.txt'><img src='1Procedural/index.html@i=text'/> php.ini.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>789B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='1Procedural/index.php.html'><img src='1Procedural/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.71KB</td>
+                                <td>2024-05-22 07:37:04</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='1Procedural/TramalhandoCom.zip'><img src='1Procedural/index.html@i=compressed'/> TramalhandoCom.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>308.71KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>O w3shool oferece o recurso de executar seus exerc&iacute;cios no pr&oacute;prio site assim como alterar e executar novamente.
+
+Outros sites tamb&eacute;m oferecem este recurso:
+
+https://www.w3schools.com/php/php_compiler.asp
+
+http://phptester.net/
+
+https://www.writep</pre>'><a href='1Procedural/PHPOnline.txt'><img src='1Procedural/index.html@i=text'/> PHPOnline.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>494B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='1Procedural/index.html@Li8xSW50cm9kdWNhbw==.html'><img src='1Procedural/index.html@i=folder'/> 1Introducao</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 08:52:34</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='1Procedural/index.html@Li9EaWNhcw==.html'><img src='1Procedural/index.html@i=folder'/> Dicas</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 08:52:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='1Procedural/HTML&#32;CSS&#32;PHP&#32;cheat&#32;sheet.pdf'><img src='1Procedural/index.html@i=file'/> HTML CSS PHP cheat sheet.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>49.45MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Problemas com Charset? Nunca mais
+
+Artigo que apresenta os principais problemas com codifica&ccedil;&atilde;o de caracteres e mostra o passo a passo de como definir o charset (encoding) UTF-8 para todas as &aacute;reas dos seus projetos PHP.
+
+Categorias: banco de </pre>'><a href='1Procedural/ProblemasComCharsetNuncaMais.txt'><img src='1Procedural/index.html@i=text'/> ProblemasComCharsetNuncaMais.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>5.48KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='1Procedural/Email.zip'><img src='1Procedural/index.html@i=compressed'/> Email.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>6.88KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='1Procedural/Arrays.zip'><img src='1Procedural/index.html@i=compressed'/> Arrays.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>125.78KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Tenho uma classe com o m&eacute;todo abaixo, que quero levar mensagens para a index.php:
+
+No m&eacute;todo:
+
+    function validateDate($date, $format = &#039;Y-m-d&#039;){
+        $b = DateTime::createFromFormat($format, $date);
+        return $b &amp;&amp; $b-&gt;format($format) ==</pre>'><a href='1Procedural/levar_msg_url.txt'><img src='1Procedural/index.html@i=text'/> levar_msg_url.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.24KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='1Procedural/crud-generator-php.zip'><img src='1Procedural/index.html@i=compressed'/> crud-generator-php.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>1010.08KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='1Procedural/Funcoes.zip'><img src='1Procedural/index.html@i=compressed'/> Funcoes.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>26.2KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+
+https://www.tutorialspoint.com/php/php_core_vs_frameworks.htm
+</pre>'><a href='1Procedural/PHPPuroxFrameworks.txt'><img src='1Procedural/index.html@i=text'/> PHPPuroxFrameworks.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>64B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Tenho um arquivo com 262 linhas, sendo uma abaixo da outra.
+
+Exemplo:
+
+Mais do que de intelig&ecirc;ncia, o mundo precisa de sentimento. Charles Chaplin! 
+A paz &eacute; a forma de nos sentirmos verdadeiramente humanos. Einstein 
+Eu chorava por n&atilde;o ter sapatos</pre>'><a href='1Procedural/str_replace.txt'><img src='1Procedural/index.html@i=text'/> str_replace.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.27KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>## 3.7 - Introdu&ccedil;&atilde;o ao PHP
+
+Abordarei apenas alguns poucos aspectos do PHP. &Eacute; importante conhecer o PHP bem para ser um programador profissional em Laravel.
+
+O PHP &eacute; atualmente a linguagem web mais popular do planeta, ficando com quase 80% do mer</pre>'><a href='1Procedural/README.txt'><img src='1Procedural/index.html@i=text'/> README.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.72KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

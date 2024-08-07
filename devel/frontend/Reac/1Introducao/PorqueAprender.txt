@@ -1,0 +1,12 @@
+Porque aprender react?
+
+
+Algumas razões.
+
+1. React é muito popular. Como desenvolvedor, é bem provável que você vá trabalhar em um projeto React no futuro. Talvez um projeto existente ou talvez sua equipe queira que você trabalhe em um novo aplicativo baseado em Reagir.
+
+2. Muitas ferramentas hoje são construídas usando o React no núcleo. Popular frameworks e ferramentas como Next.js, Gatsby e muitos outros usam React sob o capô.
+
+3. Como um engenheiro de front-end, o React provavelmente aparecerá em um trabalho entrevista.
+
+

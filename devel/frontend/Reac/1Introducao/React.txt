@@ -1,0 +1,51 @@
+Requer nodejs e npm
+
+sudo npm i -g create-react-app
+
+Acessar a pasta do projeto
+
+create-react-app meu-app
+
+Após a criação ele nos mostra alguns comandos:
+
+Created git commit.
+
+Success! Created meu-app at /home/ribafs/react/meu-app
+Inside that directory, you can run several commands:
+
+  npm start
+    Starts the development server.
+
+  npm run build
+    Bundles the app into static files for production.
+
+  npm test
+    Starts the test runner.
+
+  npm run eject
+    Removes this tool and copies build dependencies, configuration files
+    and scripts into the app directory. If you do this, you can’t go back!
+
+We suggest that you begin by typing:
+
+  cd meu-app
+  npm start
+
+Happy hacking!
+
+cd meu-app
+
+npm audit fix (para corrigir as vulnerabilidades)
+
+npm start
+
+https://www.youtube.com/watch?v=ErjWNvP6mko
+
+https://www.youtube.com/watch?v=1LhX2u6_BJE&list=PLx4x_zx8csUh752BVDGZkxYpY9lS40fyC
+
+    
+https://www.youtube.com/watch?v=2Zhig2aAKFI
+
+Src/index.js é basicamente a porta de entrada do app
+
+Usa-se className ao invés de class

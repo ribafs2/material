@@ -1,0 +1,189 @@
+Conceitos React
+
+- Componentes
+    Functions (mais usadas atualmente)
+    Classes
+- JSX
+- State
+- Props
+
+JSX
+
+JSX é HTML escrito dentro de functions ou classes React. A sintaxe HTML é  interpretada pela biblioteca react
+
+A sintaxe utilizada pelo React é chamada JSX, que significa JavaScript Syntax Extension. Trata-se de uma extensão para o JavaScript, ou seja, oferece algumas funcionalidades a mais e permite escrever de forma simples JavaScript e HTML no mesmo código.
+
+Sua característica de mesclagem entre JavaScript e HTML oferece uma sintaxe de fácil aprendizado, além de facilitar o desenvolvimento e o entendimento das funcionalidades do código.
+
+Para que o JSX seja interpretado pelo navegador ele deve passar por um transpilador de código, chamado Babel, que lê o conteúdo do arquivo .JSX e o transforma em um arquivo JavaScript — a linguagem utilizada pelos navegadores. Vale ressaltar que existem outros tipos de transpiladores semelhantes a esse.
+
+O React trabalha com o tipo de programação declarativa para interagir com o DOM. Na prática, basta dizer o que é preciso fazer e o React se encarrega de transformar a instrução em código JavaScript e executá-la da melhor maneira. Ou seja, não é feita a manipulação direta do DOM.
+
+Um exemplo é a atribuição de um texto qualquer em um elemento <h1>. Na programação declarativa, basta declarar uma variável e associá-la ao elemento HTML. O React fará a manipulação do DOM para inserir o valor dessa variável no respectivo elemento. Confira o código:
+
+const meutexto = <h1>Vamos aprender React?</h1>;
+
+ReactDOM.render(meutexto, document.getElementById('exibetexto'));
+
+No código da página HTML:
+
+<div id="exibetexto"></div>
+
+Neste exemplo foi utilizado o comando ReactDOM.render(), que é responsável por renderizar o conteúdo declarado na constante “meutexto”, utilizar o DOM virtual para encontrar o elemento “exibetexto” e inserir o seu conteúdo no elemento div.
+
+Componentes React
+
+A principal característica do React é permitir a criação de componentes que podem ser reutilizados em diversas páginas. Na prática, são blocos de códigos reutilizáveis que agregam funcionalidades e que retornam ao código HTML após a renderização pelo navegador.
+
+Os objetos em uma página podem ser dinâmicos, quando seus dados são alterados, ou estáticos, que mantêm seu conteúdo inalterado. Por exemplo, é possível declarar um título <h1> com um determinado conteúdo. Se ele for dinâmico, significa que é manipulado por uma função responsável por alterar o valor atribuído inicialmente a ele.
+
+No React, o estado dos elementos da página pode ser acessado em um componente. Basicamente, existem dois tipos de componentes, que tratam esse estado de forma diferenciada. O componente que não monitora o estado dos elementos é chamado de Stateless. Desse modo, ele conta com um objeto de propriedade em que é atribuído o seu valor fixo.
+
+Atualmente usa-se mais functions que classes.
+
+Já o modelo Stateful tem um objeto de propriedade para a atribuição de seu valor original e um objeto de estado, responsável pelas mudanças que ocorrem no conteúdo desse componente.
+
+Props
+
+As props seriam as propriedades que um componente possui e que podem ser uma ou várias. Imagine esse componente declarado por você, no caso a função produto, que retorna uma frase com a tag h2:
+
+function Produto() {
+    return <h2>Olá, {props.nome}, você comprou o produto {props.produto}, pelo preço de {props.preco}</h2>
+}
+function App() {
+    return (
+        <div>
+            <Produto nome="Luis" produto="Feijão" preco="R$ 4,22" />
+            <Produto nome="Fernanda" produto="Farinha de mandioca" preco="R$ 3,29" />
+            <Produto nome="Hernandes" produto="Fubá mimoso" preco="R$ 2,99" />
+        </div>
+    );
+}
+export default App;
+
+Ao invocar o componente, você está passando algumas propriedades a ele, tais como: 
+
+    nome: nome do(a) comprador(a); 
+    produto: nome do produto; 
+    preco: preço do produto.
+
+Essas propriedades que você está passando ao componente são valores que não podem ser alterados pela pessoa usuária, independentemente da ação que ele fizer, pois, esses valores são imutáveis, similares com variáveis constantes declaradas.
+States
+
+O state seria o estado da aplicação e, ele é gerenciado com as variáveis utilizando o hook useState. Nesse caso, os valores podem ser alterados mediante a ação da pessoa usuária, diferentemente das props. 
+
+O exemplo para esse caso seria um contador simples. Quando você clicar no botão “Incrementar”, ele vai somar o item inicial (que seria o 0 + 1, depois somará 1 + 1 e ficará 2) e assim por diante. 
+
+A mesma coisa ocorre com o botão “Decrementar”, mas ele, ao invés de somar 1, vai diminuir 1. Ou seja, há a alteração dos números na tela mediante a uma ação do usuário, que seriam os cliques no botão do contador. Vejamos o código abaixo:
+
+import React, { useState } from 'react'
+function App() {
+  const [contador, setContador] = useState(0);
+  const handleIncrement = () => {
+    setContador(contador + 1);
+  }
+  const handleDecrement = () => {
+    setContador(contador - 1);
+  }
+  return (
+    <div>
+      <button onClick={handleIncrement}>Incrementar</button>
+      <p>{contador}</p>
+      <button onClick={handleDecrement}>Decrementar</button>
+    </div>
+  )
+}
+export default App;
+
+
+Escrevendo JSX
+
+Podemos fazer:
+
+ <div>
+     <h1>Olá React</h1>
+ </div>
+ou
+ <div>
+     <h1>Olá React</h1>
+     <h1>Olá React</h1>
+     <h1>Olá React</h1>
+ </div>
+ou
+<h1>Olá React</h1>
+
+Mas não podemos fazer
+
+     <h1>Olá React</h1>
+     <h1>Olá React</h1>
+
+Não podemos ter 2 ou mais elementos adjascentes sem uma tag que os encapsule/wrapper, em geral com uma div. Somente um único elemento sem a tag encapsuladora.
+
+
+Elementos HTML
+
+No JSX todos os elementos do HTML precisam ter
+- a tag de abertura e de fechamento
+- ou se não tiver a de fechamento deve deixar o fechamento explícito.
+- Ex: <hr />, <br /> <ComponenteA />
+
+
+
+Flux
+
+Flux é o padrão de arquitetura utilizado pelo Facebook para construir páginas que acessam a sua aplicação back-end, ou seja, que se conectam à base de dados para recuperar as informações armazenadas. Ele funciona semelhante à arquitetura MVC, entretanto, difere desse modelo devido à forma de acesso aos dados ser unidirecional.
+
+O Flux pode ser dividido em alguns componentes, que são responsáveis por fazer a comunicação e a recuperação dos dados da aplicação. São eles:
+
+    Actions;
+    Dispatcher;
+    Stores;
+    Views.
+
+Vale ressaltar que o Flux é somente um padrão de arquitetura, não havendo implementações. Portanto, é preciso utilizar uma biblioteca para aplicar esse conceito — e uma maneira de fazer isso é por meio da biblioteca Redux. Falaremos sobre ela mais adiante!
+
+O que é e para que serve o React Navigation?
+
+A biblioteca React Navigation é utilizada no React Native para ser feito o controle de navegação e de roteamento em seu aplicativo. Para instalá-la em nossa aplicação mobile, devemos digitar o comando: 
+
+npm install react-navigation.
+
+Essa biblioteca trabalha com três tipos de navegação. São eles: 
+
+    DrawerNavigator: esse tipo de navegação ocorre se desejarmos utilizá-la por meio de um menu lateral (menu sanduíche, hamburger, etc);
+    StackNavigator: essa navegação ocorre caso desejarmos que, por botões, seja feita a navegação (botão de tela de login, botão de fazer logout do sistema, etc);
+    TabNavigator: a palavra “tab”, em Inglês, significa aba, ou seja, seria uma navegação através das abas do aplicativo. 
+
+
+React bootstrap: integrando o React ao bootstrap!
+
+Sim, você consegue utilizar grande parte dos recursos do React Bootstrap em sua aplicação, tais como auxiliar na responsividade, trabalhar a tela por meio de grids, customização de estilos de botões, desenvolvimento de modais, dentre outros recursos.
+
+
+Para instalar ele em nossa aplicação, devemos digitar o seguinte comando, no terminal:
+
+npm install react-bootstrap
+
+Dessa forma, para importar um botão em nossa página, devemos, inicialmente, importar ele da biblioteca react-bootstrap, no início do arquivo:
+
+import { Button } from 'react-bootstrap';
+
+Para estilizar o botão, o react-bootstrap utiliza o conceito de variant, utilizando as mesmas cores do Bootstrap (primary, secondary, success, warning, dentre outras). No exemplo abaixo, utilizamos a variant primary: 
+
+<Button variant="primary">Clique aqui!</Button>
+
+O resultado será o seguinte:
+Botão de exemplo azul com frase Clique aqui! 
+
+O que é o React redux e quando usar?
+
+O React Redux é utilizado quando queremos que alguma informação fique presente em toda a aplicação, para podermos fazer o gerenciamento de estados dela. Ele faz o compartilhamento das informações entre os componentes, para que esses componentes utilizem as informações.
+
+Um exemplo de utilização do Redux seria um carrinho de compras de uma loja virtual. Os dados do produto como nome, quantidade, valor total, são valores utilizados por muitos componentes da aplicação. Além disso, se por um acaso você sair do site da loja virtual e voltar no dia seguinte, os produtos ainda estarão no carrinho de compras sem nenhuma alteração.
+
+Para instalar ela em nosso projeto, devemos digitar o seguinte comando, no terminal: 
+
+npm install react-redux 
+
+https://blog.betrybe.com/react/
+

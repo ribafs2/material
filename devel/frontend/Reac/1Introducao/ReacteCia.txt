@@ -1,0 +1,166 @@
+Como React usa
+
+HTML
+CSS
+Javascript
+Bootstrap
+
+HTML
+
+Here's a little less opinionated version of the RawHTML function posted before. It lets you:
+
+    configure the tag
+    optionally replace newlines to <br />'s
+    pass extra props that RawHTML will pass to the created element
+    supply an empty string (RawHTML></RawHTML>)
+
+<div dangerouslySetInnerHTML={{__html: '<strong>strong text</strong>'}} />
+
+var parse = require('html-react-parser');parse('<div>text</div>');
+
+class Greeting extends React.Component {
+  render() {
+    return <h1>Hello, {this.props.name}</h1>;
+  }
+}
+
+
+import React from 'react';
+function App() {
+    return (
+        <>
+            <div id="container">
+                <div id="header">
+                    <nav>
+                        <h1>Geeksforgeeks</h1>
+                        <li><a href='#header'>Home</a></li>
+                        <li ><a href="#extra">Bolgs</a></li>
+                        <li ><a href=
+"https://www.geeksforgeeks.org/about/contact-us/?ref=write-footer">
+                            Contact US</a></li>
+                        <li ><a href=
+                            "https://practice.geeksforgeeks.org/?ref=ghm">
+                            Courses</a></li>
+                    </nav>
+                </div>
+                <div id="wrapper">
+                    <div id="content">
+                        <h1>Welcome to Geeksforgeeks</h1>
+                        <h2>Build your career with Geeksforgeeks </h2>
+                        <p>
+                            Geeksforgeeks provides you to best
+                            tutorials, articles, coding, courses etc.
+                            <p>Geeksforgeeks DSA self placed code is
+                                best course ever and it is made by experts.</p>
+                        </p>
+                        <button>Learn More</button>
+                    </div>
+                </div>
+                <div id="navigation">
+                    <img src=
+"https://media.geeksforgeeks.org/wp-content/uploads/20221207112807/Image1.png"
+                        alt="logo" />
+                </div>
+<img src="/static/media/logo.5d5d9eef.svg" class="App-logo" alt="logo">
+                <div id="extra">
+                    <div id="card">
+                        <h3>Create Math captcha using PHP</h3>
+                        <p>In this article we are implement Math captcha.</p>
+                        <button>Read More</button>
+                    </div>
+                    <div id="card">
+                        <h3>Style Google Custom Search Manually</h3>
+                        <p>We are styling Google Custom Search
+                            manually with CSS</p>
+                        <button>Read More</button>
+                    </div>
+                    <div id="card">
+                        <h3>What is Interaction Manager.</h3>
+                        <p>In this article we will see what is
+                            Interaction Manager and how use it.</p>
+                        <button>Read More</button>
+                    </div>
+                </div>
+                <div id="footer"><p>Copyright@2007</p>
+                </div>
+            </div>
+        </>
+    )
+}
+export default App;
+
+
+export default function TodoList() {
+  return (
+    // This doesn't quite work!
+    <h1>Hedy Lamarr's Todos</h1>
+    <img 
+      src="https://i.imgur.com/yXOvdOSs.jpg" 
+      alt="Hedy Lamarr" 
+      class="photo"
+    >
+    <ul>
+      <li>Invent new traffic lights
+      <li>Rehearse a movie scene
+      <li>Improve the spectrum technology
+    </ul>
+  );
+}
+
+
+CSS
+
+Veja ue CSS usa-se com import ou className. Não podemos usar class="name"
+
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import './styles.css';
+
+import App from './App';
+
+export default function Square() {
+  return <button className="square">X</button><button className="square">X</button>;
+}
+
+export default function Square() {
+  return (
+    <>
+      <button className="square">X</button>
+      <button className="square">X</button>
+    </>
+  );
+}
+
+export default function Square() {
+  return (
+    <>
+      <div className="board-row">
+        <button className="square">1</button>
+        <button className="square">2</button>
+        <button className="square">3</button>
+      </div>
+      <div className="board-row">
+        <button className="square">4</button>
+        <button className="square">5</button>
+        <button className="square">6</button>
+      </div>
+      <div className="board-row">
+        <button className="square">7</button>
+        <button className="square">8</button>
+        <button className="square">9</button>
+      </div>
+    </>
+  );
+}
+
+A classe App não veio definida no CSS, então defini e imediatamente ele funcionou.
+
+
+npm install --save bootstrap
+
+npm install --save bootstrap@latest
+
+import 'bootstrap/dist/css/bootstrap.css';
+import 'bootstrap/dist/js/bootstrap.js';
+
+

@@ -1,0 +1,23 @@
+Podemos adicionar funções dentro de funções em javascript
+
+import Pessoa from "./components/Pessoa";
+
+export default function App() {
+
+  function Maiusculas(texto){
+    return texto.toUpperCase()
+  }
+
+  return (
+    <>
+      <h1>Exemplo de props</h1>
+      <p>{Maiusculas(props.title)}</p>
+      <Pessoa
+        nome="Rodrigo"
+        idade="28"
+        profissao="Programador"
+      />
+    </>
+  )
+}
+

@@ -1,0 +1,28 @@
+LTS
+
+sudo apt-get install curl python-software-properties software-properties-common 
+curl -sL https://deb.nodesource.com/setup_18.x | sudo bash - 
+
+sudo apt install curl 
+curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash 
+
+Instalar novas versões
+
+source ~/.profile 
+
+nvm install 16.14 
+
+nvm use 16.14 
+
+node -v 
+
+Create a demo web server
+
+sudo nano http_server.js
+
+node http_server.js 
+
+Server running at http://127.0.0.1:3000/
+
+https://tecadmin.net/install-latest-nodejs-npm-on-linux-mint/
+

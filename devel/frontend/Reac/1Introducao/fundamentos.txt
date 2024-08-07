@@ -1,0 +1,126 @@
+npx create-react-app fundamentos-react
+cd fundamentos-react
+
+npm start
+
+Componente
+
+import React from 'react'
+
+function Primeiro(){
+    return (
+    <div>
+        <h1>Primeiro Componente</h1>
+        <h2>Exemplo de componente React</h2>
+    </div>
+    )
+}
+
+export default Primeiro
+
+Não podemos fazer isso no React:
+
+import React from 'react'
+
+function Primeiro(){
+    return (
+        <h1>Primeiro Componente</h1>,
+        <h2>Exemplo de componente React</h2>
+    )
+}
+
+export default Primeiro
+
+h1 e h2 precisam vir dentro de uma div
+
+
+Ao mudar o componente para
+
+import React from 'react'
+
+export default () => {
+    return (
+        <div>
+        <h1>Primeiro Componente</h1>
+        <h2>Exemplo de componente React</h2>
+        </div>
+    )
+}   
+
+O ESLint mostra o Warning
+
+Assign arrow function to a variable before exporting as module default
+
+Pesquisando ...
+
+Em resumo, esta regra reportará um erro (ou warning) caso o default export não possua um nome, e a regra foi criada para encorajar o reuso do nome que foi exportado onde está sendo importado. 
+
+Isso é danoso?
+
+O código continuará funcionando com unnamed exports, mas o ESLint serve justamente para ajudar a ter padrões e convenções em um projeto, além de reportar possíveis erros.
+
+Ou seja, não é uma boa prática usar funções anônimas arrow functions
+
+Existem várias formas de fazer, mas cuidado, pois algumas funcionam mas não são recomendadas
+
+
+Passando parâmetros em componente que vem do index.js
+
+// Como passar parâmetro para componente jsx
+import React from "react";
+
+function ComParametro( param ){
+    return (
+        <div>
+        <h3>{param.titulo}</h3>
+        <p>{1 + 2}</p>
+        </div>
+    )
+}
+export default ComParametro
+
+function ComParametro( props ){
+    return (
+        <div>
+        <h3>{props.titulo}</h3>
+        <p>{props.subtitulo}</p>
+        </div>
+    )
+}
+
+export default ComParametro
+
+Quando usamos { } em um componente, seu conteúdo será interpretado como Javascript, portando {1+2} mostrará 3
+
+
+props - propriedades
+
+Abaixo estamos instanciando componentes criados em seus arquivos na pasta components
+
+ReactDOM.render(
+    //Se tiver dois elementos adjascentes, precisam ficar dentro de uma div/invólucro
+    <div>
+        <Primeiro></Primeiro>
+        <ComParametro titulo="Este é o Título" subtitulo="Este é o Sub"/>
+        <ComParametro titulo="Olá João" subtitulo="Como vai?"/>
+    </div>,
+    document.getElementById('root')
+)
+
+        {/* 
+        <ComFilhos>
+        <ul>
+            <li>Tiago</li>
+            <li>Elias</li>
+        </ul>
+        </ComFilhos>
+        Abaixo instanciamos os componentes criados/definidos na pasta components
+        <Primeiro></Primeiro>
+        <ComParametro titulo="Este é o Título" subtitulo="Este é o Sub"/>
+        Quando usamos chaves seu conteúdo vira js*/}
+
+JSX é usar tags HTML dentro do javascript sem estarem entre aspas. Requer o import do React
+
+
+React JS Curso Rápido ⚛️ Masterclass #1 2020 - 100% Prático! do canal Cod3r Cursos
+https://www.youtube.com/watch?v=XQxitgyZ_S4&list=PLdPPE0hUkt0q7bwgAlk6UimtBKoNfM1tw

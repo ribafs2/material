@@ -1,0 +1,40 @@
+Extensão do react para escrever HTML e JS juntos
+
+JSX é uma sintaxe de extensão JavaScript usada no React para escrever facilmente HTML e JavaScript juntos.
+Escrever código em React leva muito tempo porque você precisa usar a função React.createElement todas as vezes, mesmo se estiver apenas adicionando um div simples.
+
+Em HTML os elementos podem ficar sem ser fechados
+Em JSX todos precisam ser fechados
+
+camelCase nos nomes
+
+const nav = (
+  <nav>
+    <ul>
+      <li><a href="#">Início</a></li>
+      <li><a href="#">Sobre</a></li>
+      <li><a href="#">Contato</a></li>
+    </ul>
+  </nav>
+)
+
+const jsx = <h1>Isso é JSX</h1>
+
+
+<div>
+  {inventory.filter(item => item.available).map(item => (
+    <Card>
+        <div className="title"}>{item.name}</div>
+        <div className="price">{item.price}</div>
+    </Card>
+    ))
+  }
+</div>
+
+function App() {
+  return <h1>Hello, World</h1>;
+}
+
+export default App;
+
+

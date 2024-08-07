@@ -1,0 +1,59 @@
+Criar site na Vercel com NextJS
+
+https://www.youtube.com/watch?v=EW7m2WIvFgQ
+
+Criar um repositório para o site no GH
+
+Clonar o repo criado localmente
+
+cd site-vercel
+
+Abrir no VSCode
+code .
+
+Pré-requisitos
+nodejs 10.3 para o NextJS
+
+Abrir o terminal integrado do VSCode
+
+npm init -y
+
+Instalar o NextJS
+npm install nextjs
+
+Instalar as dependências do NextJS
+
+npm install react
+npm install react-dom
+
+Poderiamos ter instalado tudo de uma vez
+
+npm i nextjs react react-dom
+
+Alterar o package.json para que fique com:
+
+"scripts": {
+    "dev": "next dev"
+},
+
+Agora basta rodar
+
+npm run dev
+
+Ao executar dá erro, pois o nextjs exige a pasta pages no raiz
+
+Cada arquivo da pasta pages vira automaticamente uma rota
+
+Criar a apsta apges no raiz
+
+Criar o arquivo
+index.js (ou index.ts, pois o nextjs suporta ambos)
+Este é o arquivo que será carregado ao carregar a home do site
+
+Criar dentro do index.js o componente
+
+function Home(){
+    return <div>Home</div>
+}
+
+export default Home // Isso indica que este será o arquivo a ser aberto por padrão

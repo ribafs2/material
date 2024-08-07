@@ -1,0 +1,71 @@
+Nomes de componentes sejam com letras meiúsculas, para não serem confundidos coom as tags do HTML que são sempre com minúsculas.
+
+Os nomes seguindo 
+
+camelCase para variáveis
+
+CamelCase para classes/funções
+
+Mas os nomes de arquivos dos projetos não podem ser camelCase, precisam ser calemcase.
+
+meuProheto dá erro
+
+Deve ser
+meuprojeto ou meu-projeto
+
+Nomes de módulos de CSS
+
+Teste.module.css
+
+O nome do componente, na mesma pasta, é Teste.js
+
+As tags do HTML no JSX devem ser obrigatoriamente fechadas, caso conrário geral erro
+
+Tags do HTML minúsculas
+Tags do JSX
+
+Nomes dos arquiivos jsx em camelCase - appContainer.jsx
+
+Nomes de compoonentes, classes ou function CalmeCase - AppContaienr
+
+Tipos de dados camelCase
+
+Nomes de arquivos e pastas de componentes em CamelCase - Form.tsx
+
+
+Evitar default export
+
+As exportações padrão não associam nenhum nome ao item que está sendo exportado, o que significa que qualquer nome pode ser aplicado durante a importação. Isso pode lhe dar uma flexibilidade, mas se vários desenvolvedores importam o mesmo módulo com nomes diferentes ou mesmo nomes não descritivos, estamos ferrados.
+
+// ❌
+const List = () => {
+  const list = ["item1", "item2", "item3"];
+
+  return (
+    <ul>
+      {list.map((value, index) => {
+        return <li key={index}>{value}</li>;
+      })}
+    </ul>
+  );
+};
+
+// ✅
+const List = () => {
+  const list = [
+    { id: "111", value: "item1" },
+    { id: "222", value: "item2" },
+    { id: "333", value: "item3" }
+  ];
+
+  return (
+    <ul>
+      {list.map((item) => {
+        return <li key={item.id}>{item.value}</li>;
+      })}
+    </ul>
+  );
+};
+
+https://levelup.gitconnected.com/react-code-conventions-and-best-practices-433e23ed69aa
+

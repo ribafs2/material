@@ -1,0 +1,576 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li8xUHJvY2VkdXJhbA==.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot; lang=&quot;en&quot;&gt;
+&lt;head&gt;
+	&lt;meta http-equiv=&quot;content-type&quot; content=&quot;text/html; charset=utf-8&quot; /&gt;
+	&lt;title&gt;</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/ShowSource.txt'><img src='Dicas/index.html@i=text'/> ShowSource.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.79KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>function foo(string $a, string $b, ?string $c = null, ?string $d = null) 
+
+    public function test(): static
+    {
+
+function bar(): ?mixed {}
+
+
+    array
+    bool
+    callable
+    int
+    float
+    null
+    object
+    resource
+    string
+
+function d</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/php-tipos.txt'><img src='Dicas/index.html@i=text'/> php-tipos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>709B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre> Constantes M&aacute;gicas no PHP
+
+Postagem do dia 01/01/1970 na categoria PHP
+
+Irei apresentar uma lista de constantes existentes no PHP que s&atilde;o muito &uacute;teis mas que muita gente desconhece ou n&atilde;o usa.
+
+O PHP fornece v&aacute;rias constantes com conte&uacute;dos div</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/ct_magicas.txt'><img src='Dicas/index.html@i=text'/> ct_magicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>5.55KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/browser-detect.php'><img src='Dicas/index.html@i=file'/> browser-detect.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>582B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Path Relativo
+
+Supondo um aplicativo no diret&oacute;rio web com 5 pastas aninhadas, uma dentro da outra, assim:
+
+dir1
+    dir2
+        dir3
+            dir4
+                dir5
+
+ou
+dir1/dir2/dir3/dir4/dir5
+
+Ent&atilde;o suponha que esteja na pasta dir3 e queir</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/Path.txt'><img src='Dicas/index.html@i=text'/> Path.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>489B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>NULL																		OPERADOR NULL
+
+Em SQL NULL &eacute; para valores inexistentes. Regra geral: NULL se propaga, o que significa que com quem NULL se combina o resultado ser&aacute; um NULL.
+NULL n&atilde;o zero, n&atilde;o &eacute; string vazia nem string de comprimento zero. </pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/null.txt'><img src='Dicas/index.html@i=text'/> null.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.8KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Dicas de PHP
+
+## Inicializa&ccedil;&atilde;o de Vari&aacute;veis
+Uma &oacute;tima maneira de manter o seu site protegido de hackers &eacute; sempre inicializar suas vari&aacute;veis para proteger o seu site de ataques XSS.
+
+## N&atilde;o fechar o php ao final do arquivo, caso esteja usando</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/Dicas.txt'><img src='Dicas/index.html@i=text'/> Dicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.14KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Desta forma vai acumulando as mensagens durante o c&oacute;digo
+
+&lt;?php
+require_once &#039;connection.php&#039;;
+
+session_start();
+
+if(isset($_SESSION[&quot;admin_login&quot;])) //check condition admin login not direct back to index.php page
+{
+ header(&quot;location: admin/admin_ho</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/msg-erro.txt'><img src='Dicas/index.html@i=text'/> msg-erro.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.88KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Trabalhando com includes em PHP
+
+## Vale lembrar
+
+Que o PHP atualmente, quando trabalhamos com orienta&ccedil;&atilde;o a objetos, &eacute; muito mais interessante trabalhar com namespaces e autoload com PSR-4. Inclusive os grandes frameworks fazem isso. Essa aborda</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/Includes.txt'><img src='Dicas/index.html@i=text'/> Includes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.45KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/password_hash%20password_verify.odt'><img src='Dicas/index.html@i=file'/> password_hash password_verify.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>30.46KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/index.php'><img src='Dicas/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Por conta da seguran&ccedil;a prefira usar:
+
+POST ou GET ao inv&eacute;s de REQUEST
+
+REQUEST &eacute; mais abrangente e funciona tanto para GET quanto para POST
+</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/Requisicoes.txt'><img src='Dicas/index.html@i=text'/> Requisicoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>143B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Em alguns projetos eu criei dois arquivos header.php, sendo um para o raiz e outro para os arquivos das pastas internas
+Ent&atilde;o pesquisei sobre uma fun&ccedil;&atilde;o para detectar o diret&oacute;rio atual
+
+&lt;?php if( basename($_SERVER[&#039;REQUEST_URI&#039;], &quot;.php&quot;)==&#039;estoqu</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/diretorio_atual.txt'><img src='Dicas/index.html@i=text'/> diretorio_atual.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>732B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Tenho uma classe com o m&eacute;todo abaixo, que quero levar mensagens para a index.php:
+
+No m&eacute;todo:
+
+    function validateDate($date, $format = &#039;Y-m-d&#039;){
+        $b = DateTime::createFromFormat($format, $date);
+        return $b &amp;&amp; $b-&gt;format($format) ==</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/levar_msg_url.txt'><img src='Dicas/index.html@i=text'/> levar_msg_url.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.24KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>/*
+ * RANDOM PASSWORD GENERATION ALGORITHM
+ * PROGRAMMED BY: BRIAN GRIFFIN
+ * January 1, 2003
+ * MXrider005@hotmail.com
+ * https://www.planet-source-code.com/vb/scripts/ShowCode.asp?txtCodeId=872&amp;lngWId=8
+ * You can use this freely. Just don&#039;t credit</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/pass-gen-rand.txt'><img src='Dicas/index.html@i=text'/> pass-gen-rand.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.55KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Arrays pela url
+
+exemplo.php?vetor[]=valor1&amp;vetor[]=valor2&amp;vetor[]=valor3
+</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/get_url.txt'><img src='Dicas/index.html@i=text'/> get_url.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>74B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>    function validateDate($date, $format = &#039;Y-m-d&#039;){
+        $b = DateTime::createFromFormat($format, $date);
+        return $b &amp;&amp; $b-&gt;format($format) === $date;
+    }
+
+Usando
+
+        if(!$this-&gt;validateDate($nascimento)){
+		    header(&quot;location: in</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/data_validar.txt'><img src='Dicas/index.html@i=text'/> data_validar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>346B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Redirecionar imediatamente para a index.php
+
+header(&quot;locate: index.php&quot;);
+
+Atualiza por 4 segundos e depois redireciona para a index.php
+
+header(&quot;refresh:4;index.php&quot;);
+</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/Redirecionar.txt'><img src='Dicas/index.html@i=text'/> Redirecionar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>169B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>PHP Exceptions
+
+What is an Exception?
+
+An exception is an object that describes an error or unexpected behaviour of a PHP script.
+
+Exceptions are thrown by many PHP functions and classes.
+
+User defined functions and classes can also throw exceptions.</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/PHP%20Exceptions.txt'><img src='Dicas/index.html@i=text'/> PHP Exceptions.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.43KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>string password_hash ( string $password , integer $algo [, array $options ] )
+boolean password_verify ( string $password , string $hash )
+boolean password_needs_rehash ( string $hash , integer $algo [, array $options ] )
+array password_get_info ( str</pre>'><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/php-senhas.txt'><img src='Dicas/index.html@i=text'/> php-senhas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.87KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/1Procedural/Dicas/tempo-intervalo.php'><img src='Dicas/index.html@i=file'/> tempo-intervalo.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>897B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,5 @@
+npm install --save @ant-design/icons
+
+npm i @ant-design/icons
+
+npm install react-router-dom

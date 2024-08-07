@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1"/>
+		<link rel="stylesheet" type="text/css" href="crud-sqlite-mysql-postgres/css/bootstrap.css"/>
+	</head>
+<body>
+	<nav class="navbar navbar-default">
+		<div class="container-fluid">
+			<a class="navbar-brand" href="crud-sqlite-mysql-postgres/css/bootstrap.css">Sourcecodester</a>
+		</div>
+	</nav>
+	<div class="col-md-3"></div>
+	<div class="col-md-6 well">
+		<h3 class="text-primary">CRUD com SQLite, MySQL ou PostgreSQL usando PDO</h3>
+		<hr style="border-top:1px dotted #ccc;"/>
+		<button type="button" class="btn btn-success" data-toggle="modal" data-target="#form_modal"><span class="glyphicon glyphicon-plus"></span> Adicionar</button>
+		<br /><br/ >
+		<table class="table table-bordered">
+			<thead class="alert-info">
+				<tr>
+					<th>Nome</th>
+					<th>E-mail</th>
+					<th>Cidade</th>
+					<th>Ação</th>
+				</tr>
+			</thead>
+			<tbody>
+								<tr>
+					<td>Ribamar FS</td>
+					<td>ribafs@gmail.com</td>
+					<td>Fortaleza</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update14"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=14" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update14">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Ribamar FS" name="name"/>
+											<input type="hidden" class="form-control" value="14" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="ribafs@gmail.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="Fortaleza" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>Sean Kennedy</td>
+					<td>seankennedy.boss@outlook.com</td>
+					<td>Seattle</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update13"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=13" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update13">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Sean Kennedy" name="name"/>
+											<input type="hidden" class="form-control" value="13" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="seankennedy.boss@outlook.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="Seattle" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>Mark Higgins</td>
+					<td>mark.higgins21@yahoo.com</td>
+					<td>Houston</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update12"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=12" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update12">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Mark Higgins" name="name"/>
+											<input type="hidden" class="form-control" value="12" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="mark.higgins21@yahoo.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="Houston" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>Austin Joseph</td>
+					<td>austin.joseph.boston@gmail.com</td>
+					<td>Boston</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update11"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=11" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update11">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Austin Joseph" name="name"/>
+											<input type="hidden" class="form-control" value="11" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="austin.joseph.boston@gmail.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="Boston" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>Demi Milan</td>
+					<td>demimilan@gmail.com</td>
+					<td>Austin</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update10"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=10" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update10">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Demi Milan" name="name"/>
+											<input type="hidden" class="form-control" value="10" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="demimilan@gmail.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="Austin" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>John Alex</td>
+					<td>johnalex@example.com</td>
+					<td>Chicago</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update9"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=9" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update9">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="John Alex" name="name"/>
+											<input type="hidden" class="form-control" value="9" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="johnalex@example.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="Chicago" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>Michael Bruce</td>
+					<td>michaelbruce78@yahoo.com</td>
+					<td>Los Angeles</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update8"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=8" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update8">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Michael Bruce" name="name"/>
+											<input type="hidden" class="form-control" value="8" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="michaelbruce78@yahoo.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="Los Angeles" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>Jennifer Winters</td>
+					<td>jennie.winters001@gmail.com</td>
+					<td>Miami</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update7"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=7" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update7">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Jennifer Winters" name="name"/>
+											<input type="hidden" class="form-control" value="7" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="jennie.winters001@gmail.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="Miami" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>Lilly Whites</td>
+					<td>lillywhites@outlook.com</td>
+					<td>New York</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update6"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=6" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update6">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Lilly Whites" name="name"/>
+											<input type="hidden" class="form-control" value="6" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="lillywhites@outlook.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="New York" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>Rose Harris</td>
+					<td>roseharris@gmail.com</td>
+					<td>New York</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update5"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=5" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update5">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Rose Harris" name="name"/>
+											<input type="hidden" class="form-control" value="5" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="roseharris@gmail.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="New York" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>Julia Brown</td>
+					<td>juliabrown@gmail.com</td>
+					<td>Los Angeles</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update4"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=4" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update4">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Julia Brown" name="name"/>
+											<input type="hidden" class="form-control" value="4" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="juliabrown@gmail.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="Los Angeles" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>Daniel Greyson</td>
+					<td>danielgreyson@hotmail.com</td>
+					<td>New York</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update3"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=3" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update3">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Daniel Greyson" name="name"/>
+											<input type="hidden" class="form-control" value="3" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="danielgreyson@hotmail.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="New York" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+								<tr>
+					<td>Taylor Fox</td>
+					<td>taylorfox@hotmail.com</td>
+					<td>San Francisco</td>
+					<td><button class="btn btn-warning" type="button" data-toggle="modal" data-target="#update2"><span class="glyphicon glyphicon-edit"></span> Editar</button> <a href="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/delete.php?id=2" class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> Excluir</a></td>
+				</tr>
+				
+				<div class="modal fade" id="update2">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<form action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/update.php" method="POST">
+								<div class="modal-header">
+									<h3 class="modal-title">Atualizar</h3>
+								</div>
+								<div class="modal-body">
+									<div class="col-md-2"></div>
+									<div class="col-md-8">
+										<div class="form-group">
+											<label>Nome</label>
+											<input type="text" class="form-control" value="Taylor Fox" name="name"/>
+											<input type="hidden" class="form-control" value="2" name="id"/>
+										</div>
+										<div class="form-group">
+											<label>E-mail</label>
+											<input type="text" class="form-control" value="taylorfox@hotmail.com" name="email"/>
+										</div>
+										<div class="form-group">
+											<label>Cidade</label>
+											<div class="form-group">                            
+											<input type="text" class="form-control" value="San Francisco" name="city"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div style="clear:both;"></div>
+								<div class="modal-footer">
+									<button class="btn btn-warning" name="update"><span class="glyphicon glyphicon-update"></span> Atualizar</button>
+									<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+							</tbody>
+		</table>
+	</div>
+	<div class="modal fade" id="form_modal" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<form method="POST" action="http://backup/material/devel/backend/PHP/CRUDs/crud-sqlite-mysql-postgres/add.php">
+					<div class="modal-header">
+						<h3 class="modal-title">Adicionar</h3>
+					</div>
+					<div class="modal-body">
+						<div class="col-md-2"></div>
+						<div class="col-md-8">
+							<div class="form-group">
+								<label>Nome</label>
+								<input type="text" class="form-control" name="name"/>
+							</div>
+							<div class="form-group">
+								<label>E-mail</label>
+								<input type="text" class="form-control" name="email"/>
+							</div>
+							<div class="form-group">
+								<label>Cidade</label>
+								<input type="text" class="form-control" name="city"/>
+							</div>
+						</div>
+					</div>
+					<div style="clear:both;"></div>
+					<div class="modal-footer">
+						<button class="btn btn-primary" name="save">Salvar</button>
+						<button type="button" class="btn btn-danger" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Fechar</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+<script src="crud-sqlite-mysql-postgres/js/jquery-3.2.1.min.js"></script>
+<script src="crud-sqlite-mysql-postgres/js/bootstrap.js"></script>
+</body>
+</html>

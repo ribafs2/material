@@ -1,0 +1,19 @@
+
+// Lá remove todas as funções/classes iinclusite o export dela
+function MeuBotao() {
+  return (
+    <button>
+      Eu sou um botão
+    </button>
+  );
+}
+
+export default function MeuApp() {
+  return (
+    <div>
+      <h1>Bem vindo ao meu app</h1>
+      <MeuBotao />{<br/>}
+      <MeuBotao />
+    </div>
+  );
+}

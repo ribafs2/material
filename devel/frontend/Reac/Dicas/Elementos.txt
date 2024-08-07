@@ -1,0 +1,3 @@
+Diferencia elementos, que são os do HTML, dos JSX, que são os do React, que contém HTML.
+
+

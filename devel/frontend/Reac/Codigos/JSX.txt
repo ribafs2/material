@@ -1,0 +1,154 @@
+Exemplo funcional
+
+export default function MinhaApp() {
+  return (
+    <div>
+      <h1 className="centro cor">Olá mundo2!</h1>
+      <Jsx />
+    </div>
+  );
+}
+
+function Jsx() {
+  return (
+    <div>
+      <h1>Primeiro JSX2</h1>
+        </div>
+  );
+}
+
+
+Podemos passar variáveis entre {} cmo no exemplo
+
+export default function MeuApp() {
+  return (
+    <div>
+      <h1>Primeiro JSX</h1>
+      <MeuBotao />{<br/>}
+      <MeuBotao />
+      <p>Segundo JSX Element!</p>
+      <p>Terceiro JSX Element</p>
+    </div>
+  );
+}
+
+The export default keywords specify the main component in the file. 
+
+O que está dentro das div é JSX
+
+function formatName(user) {
+  return user.firstName + ' ' + user.lastName;
+}
+
+Pode tornar o HTML dinâmico passando variáveis para ele
+
+const user = {
+  firstName: 'Harper',
+  lastName: 'Perez'
+};
+
+const element = (
+  <h1>
+    Hello, {formatName(user)}!  </h1>
+);
+
+------------
+function getGreeting(user) {
+  if (user) {
+    return <h1>Hello, {formatName(user)}!</h1>;  }
+  return <h1>Hello, Stranger.</h1>;}
+
+------------
+JSX tags may contain children:
+
+const element = (
+  <div>
+    <h1>Hello!</h1>
+    <h2>Good to see you here.</h2>
+  </div>
+);
+
+
+class JSXDemo extends React.Component {
+    render() {
+        return React.createElement("h1", null, "This is JSX");
+    }
+}
+
+class JSXDemo extends React.Component {
+  handleOnClick = () => {
+    console.log("clicked");
+  };
+  render() {
+    return (
+      <button id="btn" onClick={this.handleOnClick}>
+        Click Here
+      </button>
+    );
+  }
+}
+
+ReactDOM.render(<JSXDemo />, document.getElementById("root"));
+
+
+import React from "react";
+import ReactDOM from "react-dom";
+
+const App = () => {
+  return (
+      <p>This is first JSX Element!</p>
+      <p>This is another JSX Element</p>
+  );
+};
+
+const rootElement = document.getElementById("root");
+ReactDOM.render(<App />, rootElement);
+
+
+    import React, { Component } from 'react';  
+    class App extends Component{  
+       render(){  
+          return(  
+             <div>  
+                <h1>JavaTpoint</h1>  
+              <h2>Training Institutes</h2>  
+                <p>This website contains the best CS tutorials.</p>  
+             </div>  
+          );  
+       }  
+    }  
+    export default App;  
+
+
+    import React, { Component } from 'react';  
+    class App extends Component{  
+       render(){  
+          return(  
+             <div>  
+                 <h1>JavaTpoint</h1>  
+               <h2>Training Institutes</h2>  
+                 <p data-demoAttribute = "demo">This website contains the best CS tutorials.</p>  
+             </div>  
+          );  
+       }  
+    }  
+    export default App;  
+
+
+    import React, { Component } from 'react';  
+    class App extends Component{  
+       render(){  
+          return(  
+             <div>  
+                <h1 className = "hello" >JavaTpoint</h1>  
+                <p data-demoAttribute = "demo">This website contains the best CS tutorials.</p>  
+             </div>  
+          );  
+       }  
+    }  
+    export default App;  
+
+https://www.javatpoint.com/react-jsx
+
+
+

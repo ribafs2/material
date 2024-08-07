@@ -1,0 +1,548 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+        
+<style>
+a:link {
+  color: red;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: green;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: black;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+a:active {
+  color: yellow;
+  background-color: transparent;
+  text-decoration: underline;
+}
+</style>         
+	</head>
+    <body style="font-size: 15px;">
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../../index.php@Li9mcm9udGVuZA==.html'>Ribamar FS - Material Bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr class='success'>
+                                                        
+                                <td><a href='index.php@Li9FeGVtcGxvcw==.html'><img src='index.php@i=folder'/> Exemplos</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:02:52</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Country
+pattern=&quot;[A-Za-z]{3}&quot;
+
+Password (UpperCase, LowerCase and Number)
+^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\s).*$
+
+Password (UpperCase, LowerCase, Number/SpecialChar and min 8 Chars)
+(?=^.{8,}$)((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*</pre>'><a href='Pattern_regex.txt'><img src='index.php@i=text'/> Pattern_regex.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.13KB</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># HTML
+```html
+Version     Specification               Release Date
+1.0         N/A                         1994-01-01
+2.0         RFC 1866                    1995-11-24
+3.2         W3C: HTML 3.2 Specification 1997-01-14
+4.0         W3C: HTML 4.0 Spe</pre>'><a href='1Introducao.txt'><img src='index.php@i=text'/> 1Introducao.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.11KB</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Embedded Content: Video e Audio
+
+HTML5 introduces a swathe of new tags to accommodate the increasingly interactive and multimedia nature of the Web. While there have been numerous ways to embed video, audio, and dynamic imagery in the past, the new w</pre>'><a href='video-audio.txt'><img src='index.php@i=text'/> video-audio.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.43KB</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='abas.html'><img src='index.php@i=file'/> abas.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.94KB</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Country
+pattern=&quot;[A-Za-z]{3}&quot;
+
+Password
+pattern=&quot;.{6,}&quot;
+
+Password (UpperCase, LowerCase and Number)
+
+^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\s).*$
+
+Password (UpperCase, LowerCase, Number/SpecialChar and min 8 Chars)
+
+(?=^.{8,}$)((?=.*\d)|(?=.*\W+))(?![.</pre>'><a href='dicas_html5.txt'><img src='index.php@i=text'/> dicas_html5.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.87KB</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Option groups
+
+The optgroup element groups options in a select box. It requires a label attribute, the value of which is displayed as a non-selectable pseudo-heading preceding that group in the drop-down list of visual browsers.
+
+
+&lt;select name=&quot;count</pre>'><a href='option-groups.txt'><img src='index.php@i=text'/> option-groups.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>804B</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&lt;ul&gt;
+    &lt;li&gt;&lt;a href=&quot;here.html&quot; tabindex=&quot;1&quot;&gt;Here&lt;/a&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;a href=&quot;there.html&quot; tabindex=&quot;3&quot;&gt;There&lt;/a&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;a href=&quot;limbo.html&quot; tabindex=&quot;2&quot;&gt;Limbo&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+</pre>'><a href='tabindex.txt'><img src='index.php@i=text'/> tabindex.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>181B</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>## Tags sem&acirc;nticas 
+O HTML5 trouxe v&aacute;rias tags sem&acirc;nticas, que n&atilde;o t&ecirc;m fun&ccedil;&atilde;o e s&atilde;o apenas descritivas, para juntar &agrave; div: article, header, footer, section, etc. 
+
+Estas incluem main, header, footer, nav, video, article, section e outros.
+
+E</pre>'><a href='semanticas.txt'><img src='index.php@i=text'/> semanticas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.84KB</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='index.php.html'><img src='index.php@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.71KB</td>
+                                <td>2024-05-22 07:37:04</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='index.php@Li9TZWxlY3Rz.html'><img src='index.php@i=folder'/> Selects</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:03:02</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Accesskeys
+
+Access keys allow easier navigation by assigning a keyboard shortcut to a link (which will usually gain focus when the user presses &ldquo;Alt&rdquo; or &ldquo;Ctrl&rdquo; + the access key).
+
+&lt;a href=&quot;somepage.html&quot; accesskey=&quot;s&quot;&gt;Some page&lt;/a&gt;
+
+</pre>'><a href='accesskey.txt'><img src='index.php@i=text'/> accesskey.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>241B</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>HTML
+Version     Specification               Release Date
+1.0         N/A                         1994-01-01
+2.0         RFC 1866                    1995-11-24
+3.2         W3C: HTML 3.2 Specification 1997-01-14
+4.0         W3C: HTML 4.0 Specification</pre>'><a href='Historia.txt'><img src='index.php@i=text'/> Historia.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>529B</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tags_semanticas.html'><img src='index.php@i=file'/> tags_semanticas.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.36KB</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Atributos das TAGs HTML
+
+A maioria das tags suporta atributos.
+
+Alguns atributos s&atilde;o muito importantes para o uso do CSS, no caso o
+
+- id - este deve ser usado uma &uacute;nica vez na p&aacute;gina, como se fosse uma chave prim&aacute;ria de uma tabela SQL
+
+Exemplo</pre>'><a href='Atributos.txt'><img src='index.php@i=text'/> Atributos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>481B</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tabela.html'><img src='index.php@i=file'/> tabela.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.44KB</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># TAGs Principais
+
+- DOCTYPE
+&lt;!DOCTYPE html&gt; &ndash; A tag !DOCTYPE informa ao navegador a vers&atilde;o do HTML que est&aacute; sendo utilizada no documento. Por exemplo: no HTML5, basta incluir !DOCTYPE html, e assim o navegador j&aacute; saber&aacute; que se trata de um docu</pre>'><a href='TAGs.txt'><img src='index.php@i=text'/> TAGs.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.59KB</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>HTML Input Types
+
+Here are the different input types you can use in HTML:
+
+    &lt;input type=&quot;button&quot;&gt;
+    &lt;input type=&quot;checkbox&quot;&gt;
+    &lt;input type=&quot;color&quot;&gt;
+    &lt;input type=&quot;date&quot;&gt;
+    &lt;input type=&quot;datetime-local&quot;&gt;
+    &lt;input type=&quot;email&quot;&gt;
+    &lt;input ty</pre>'><a href='input_types.txt'><img src='index.php@i=text'/> input_types.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>936B</td>
+                                <td>2024-02-03 11:21:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='style.class.php.html'><img src='index.php@i=file'/> style.class.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.22KB</td>
+                                <td>2024-01-31 08:47:00</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

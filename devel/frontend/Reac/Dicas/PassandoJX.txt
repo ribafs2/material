@@ -1,0 +1,165 @@
+Passando elementos JSX
+// define o componente Exemplo a partir de uma função
+function Exemplo(props) {
+  return (<>
+    <p><b>Categoria: {props.categoria}</b></p>
+    Elementos Filhos ({props.children.length}):
+    {props.children}
+  </>)     
+}   
+
+function App() {
+return(<>
+   <h1>Usando props.children</h1>
+    <hr/>    
+   <h2>Primeiro exemplo: </h2>
+   <Exemplo categoria= {"frutas"}>
+     <div>Laranja</div>
+     <div>Maça</div>
+     <div>Banana</div>
+   </Exemplo>
+   <h2>Segundo exemplo com filhos diferentes: </h2>
+   <Exemplo categoria = {"letras"}>
+     <div>A</div>
+     <div>B</div>
+     <div>C</div>
+     <div>D</div>
+   </Exemplo>
+</>)
+}
+
+// define o componente Exemplo a partir de uma função
+function Exemplo(props) {
+  let lista = []
+  for (let i in props.children) {
+     lista.push(<li>Item {(parseInt(i)+1)} = {props.children[i]}</li>)                          
+  }
+  return (<>
+    <h2>{props.cat}</h2>
+    <b>Elementos Filhos ({props.children.length}): </b>
+    {lista}
+  </>)     
+} 
+
+function App() {
+return(<>
+   <h1>Usando props.children</h1>
+        <hr/>
+    <Exemplo cat={"frutas"}>{["laranja","limão","uva"]}</Exemplo>
+    <Exemplo cat={"Letras"}>{["A","B","C"]}</Exemplo>
+    <Exemplo cat={"Animais"}>{["Cachorro","Gato","Coelho","Tartaruga"]}</Exemplo>
+</>)
+}
+
+// define o componente Foo a partir de uma função
+const Foo = (props) => (
+  <div>
+    <p>Eu sou o componente {Foo.name}</p>
+    <p>Minha props "numeros": {props.numeros}</p>
+    <p>Eu tenho {props.children.length} elementos filhos (componentes).</p>
+    <p>Eles são: {props.children}.</p>
+    <p>{Array.isArray(props.children) ? 'Meus filhos são um array.' : ''}</p>
+  </div>
+)
+
+const Baz = () => <span>o <b>{Baz.name}</b> e</span>;
+const Bar = () => <span> o <b>{Bar.name}</b></span>; 
+
+function App() {
+        return(<>
+                <h1>Usando props.children</h1>
+                <hr/>
+                <Foo numeros = {123}>
+                        <Baz />
+                        <Bar />
+                </Foo>
+</>)
+}
+
+// define o componente Exemplo a partir de uma função
+function Exemplo(props) {
+  let lista = []
+  for (let i in props.children) {
+     lista.push(<li>Item {(parseInt(i)+1)} = {props.children[i]}</li>)                          
+  }
+  return (<>
+    <h2>{props.cat}</h2>
+    <b>Elementos Filhos ({props.children.length}): </b>
+    {lista}
+  </>)     
+} 
+
+function App() {
+return(<>
+   <h1>Usando props.children</h1>
+        <hr/>
+    <Exemplo cat={"frutas"}>{["laranja","limão","uva"]}</Exemplo>
+    <Exemplo cat={"Letras"}>{["A","B","C"]}</Exemplo>
+    <Exemplo cat={"Animais"}>{["Cachorro","Gato","Coelho","Tartaruga"]}</Exemplo>
+</>)
+}
+
+// Criando o componente Welcome() a partir de uma função
+function Welcome(props)  {
+        return (<>
+        <p>Meu conteúdo é: <b>{props.children}</b></p>
+        <p>Tenho {props.children.length} elementos</p>
+        <p>Meu tipo é {typeof props.children}</p>
+        <p>{Array.isArray(props.children) ? "(Sou um array)" : null}</p>
+        <p>Meu segundo elemento é: {props.children[1]}</p>
+        <hr/>
+        </>)    
+}
+    
+// Criando o componente Function() a partir de uma função
+function Fuctions(props) {
+        return (<>
+        <p>Meu conteúdo é: <b>{props.children()}</b></p>
+        <p>Tenho {props.children.length} elementos</p>
+        <p>Meu tipo é {typeof props.children}</p>                
+        <hr/>
+    </>)
+}
+    
+function App() {
+        return (<>
+      <h1>Tipos de props.children</h1>
+      <hr/>
+      <Welcome>Eu sou o elemento filho</Welcome>
+      <Welcome>
+          <div>A</div>
+          <div>B</div>
+          <div>C</div>
+      </Welcome>
+      <Welcome>{["laranja","limão","uva"]}</Welcome>
+      <Fuctions>{() => {return "hello world!"}}</Fuctions>                
+    </>)
+}
+
+// Criando o componente Welcome() a partir de uma função
+function Welcome(props)  {
+        return (<>
+        <p>Meu conteúdo é: <b>{props.children}</b></p>
+        <p>Tenho {props.children.length} elemento(s) (propriedade length)</p>
+        <p>Tenho {React.Children.count(props.children)} elemento(s) (utilitário)</p>
+        <p>Meu tipo é {typeof props.children}</p>
+        <p>{Array.isArray(props.children) ? "(Sou um array)" : null}</p>
+        <hr/>
+        </>)    
+}
+    
+function App() {
+        return (<>
+      <h1>Contanto elementos props.children</h1>
+      <hr/>
+      <Welcome>Eu sou o elemento filho</Welcome>
+      <Welcome>
+          <div>A</div>
+          <div>B</div>
+          <div>C</div>
+      </Welcome>
+      <Welcome>{["laranja","limão","uva"]}</Welcome>                
+    </>)
+}
+
+

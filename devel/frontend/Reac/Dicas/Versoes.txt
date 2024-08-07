@@ -1,0 +1,39 @@
+A briga do iniciante com as versões
+
+Estou iniciando em react.
+Como já tenho experiência em outras linguagens isso talvez tenha me despertado mais cedo.
+
+Ao baixar um exemplo para testar ou pegar um tutorial e tentar seguir não atentamos se estamos coom a versão "certa" do react para isso.
+Ainda não estou dominando bem as diiiferenças entre versões, mas já percebi sua influência, então fiz uma pequena pesquisa e o resultado está abaixo. 
+Me parece que as escolas deviam chamar a atenção sobre isso.
+Caso alguém possa acrescentar algo agradeço. Valeu
+
+A confusão das versões no iniciante
+
+Versões do React
+
+17
+
+18 - atual
+
+https://pt-br.legacy.reactjs.org/versions/
+https://github.com/facebook/react/releases
+
+Versões do react-router
+
+5 - 
+
+6 - atual
+
+https://www.npmjs.com/package/react-router-dom
+
+Guia recomendado
+https://reactrouter.com/en/main/start/tutorial
+
+Ainda por cima, especificamente no React, temos os vários métodos de instalação que provocam alterações:
+
+- Usando CDN
+- create-react-app
+- Vite
+
+

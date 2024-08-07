@@ -1,0 +1,164 @@
+Uma das regras principais do react: não devemos interagir diretamente com o DOM.
+
+Tudo no react é um componente, umm dentro do outro
+
+Um componente pode carregar mais coisas que as aparências e as funcionacidades. Ele pode ter memmória, estado
+
+Ao digitar uma rota, dependendo de como agimos, o VSCode adiciona o importe respectivo.
+No exemplo abaixo, ao começar a digitar Sobre, ele abre o select, então ao clicar em Sobre ele irá inserir o respectivo import do componente Sobre
+
+    <Route path="/sobre" element={<Sobre />} />
+
+JS é compatível com jSX
+App.js com App.jsx
+
+Veja que nomes de projetos não podem ser assim, doZero:
+
+doZero
+Cannot create a project named "doZero" because of npm naming restrictions:
+
+  * name can no longer contain capital letters
+
+O servicor tem um autorefresh. Qualquer alteração feita noódigo e salva será refletida na tela
+
+Please choose a different project name.
+
+Mas dozero podem
+
+
+Duas boas extensões
+
+ReactJS code snippets
+ES7+ React/Redux/React-Native snippets
+
+Digitamos
+
+rcc - React Class Component
+
+Exemplo:
+Criamos um componente chamado Client.jsx
+
+O VSCode abre o editor para criarmos o componente
+Então digitamos
+
+rcc e teclamos enter, ele irá criar
+
+import React, { Component } from 'react';
+
+class Client extends Component {
+    render() {
+        return (
+            <div>
+                
+            </div>
+        );
+    }
+}
+
+export default Client;
+
+Ele pega o nome do arquivo  cria a estrutura de uma class component e mesmo que digitemos com inicial minúscula, ele coloca com inicial maiúscula.
+
+Para funtion component
+
+rfc
+
+
+Criação dos imports
+
+Digitar, exemplo
+
+import React selecionar React na lista e teclar enter. Ele irá completar o restante: from 'react'
+
+
+Completar HTML no React
+
+Quando o VSCode não estiver autocompletando o HTML então selecionar o código fonte abaixo e mudar de Javascript para Javascript React
+Assim ele já fecha as tags como <hr/>
+
+
+Extensão para o navegador
+React Developer Tools
+Mostra components
+
+
+Formatar documento
+Indentação
+
+Clicar no código com o botão direito - Format Document
+
+
+Hospedar projetos com react
+
+https://vercel.com/
+https://www.netlify.com/
+https://www.heroku.com/
+
+
+Alias para npm start
+
+Como usamos muito, então criar o alias em
+
+nano ~/.bashrc
+
+alias ns="npm start"
+
+Ao invés de digitar npm start, digoto apenas ns
+
+Copiar e colar em várias linhas:
+
+- Selecionar o que deseja copiar, teclar Ctrl+C
+- Clicar na segunda linha, exatamente onde deseja colar
+- Assim também nas demais linhas
+- Ao final teclar Ctrl+V
+
+Tecla de atalho para abrir o terminal no VSCode
+
+- Keyboard Shortcut
+- Na caixa de busca digitar
+    workbench.action.terminal.toggleTerminal
+Efetuar um duplo clique na linha acima
+Pressione Ctrl+T e enter
+Assim já poderemos abrir o terminal com
+Ctrl+T
+
+Saber a versão
+
+npm view react version
+npm view react-dom version
+npm view react-router-dom version
+npm view react-native version
+
+React Fragment
+Ao invés de usar um wrapper como o <div> para agrupar tags jsx, podemos usar o react fragment
+
+<>
+...
+</>
+
+Também podemos usar
+<Fragment>
+
+</Fragment>
+
+Comentar algumas linhas
+O VSCode detecta se está num trecho HTML, JS ou JSX e comenta direitinho
+- Selecione as linhas a comentar
+- Tecle Ctrl+/
+
+Descomentar uma ou mais linhas comentadas
+- Selecionar e teclar Ctrl+/
+
+https://www.youtube.com/playlist?list=PLXik_5Br-zO81Km_6SI3ttfZfECxVM4ki
+
+
+Configurar VSCode para salvar automaticamente os arquivos
+
+File - Preferences - Online services settings
+Digite save na caixa de busca
+Text editor - Files
+Files: AutoSave
+onFocusChange
+
+Tecla de atalho para abrir o Inspetor no navegador - F12
+

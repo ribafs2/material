@@ -1,0 +1,74 @@
+A estrutura de arquivos gerada após a instalação depende do método de instalação.
+
+Para mostrar isso vamos agora instalar dois app usando create-react-app e Vite
+
+npx create-react-app testesr
+
+Quando este método acima termina o node_modules já está completa. Veja a estrutura:
+
+/node_modules
+/public
+/src
+.git
+package.json
+package-lock.json
+README.md
+.gitignore
+
+/public
+
+favicon.ico
+index.html
+logo192.png
+logo512.png
+manifest.json
+robots.txt
+
+src/
+
+App.css
+App.js
+App.test.js
+index.css
+index.js
+logo.svg
+reportWebVitals.js
+setupTests.js
+
+É uma estrutura de certa forma grande.
+
+Agora vejamos a estrutura criada com o Vite bem atual
+
+Usei o comando:
+
+/dist - não vou olhar pois esta é para produção
+/node_modules
+/public
+/src
+index.html
+package.json
+package-lock.json
+vite.config.js
+.gitignore
+
+/public
+
+vite.svg
+
+/src
+
+/assets
+    react.svg
+App.css
+App.jsx
+index.css
+main.jsx
+
+
+Interessante também é dar uma olhada nos arquivos principais src/index.js/main.jsx e src/App.jsx, public/index.html também
+
+Em termos de tamanho o index.html é muito menor no do Vite que no outro e não está no public. Mas também tem o id="root".
+
+Já os index/main e App não tem grande diferença.
+
+

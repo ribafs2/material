@@ -1,0 +1,460 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li8xQW1iaWVudGU=.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>XAMPP: C:\xampp\htdocs
+&bull; WampServer: C:\wamp\www
+&bull; EasyPHP: C:\EasyPHP\www
+&bull; IIS: C:\inetpub\wwwroot
+&bull; MAMP: /Applications/MAMP/htdocs
+&bull; Pacotes: /var/www/html
+
+</pre>'><a href='Linux/dir-web.txt'><img src='Linux/index.html@i=text'/> dir-web.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>171B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Melhorando a performance do Linux Mint 20.1 com Cinnamon
+
+Hardware (para melhorar):
+- Um disco SSD
+- Mais mem&oacute;ria RAM
+- Processador mais r&aacute;pido (Ex.: em geral intel i7 &eacute; melhor que i5 e i5 melhor que i3. As gera&ccedil;&otilde;es tamb&eacute;m importam. Evite Celer</pre>'><a href='Linux/MintPerformance.txt'><img src='Linux/index.html@i=text'/> MintPerformance.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.06KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>## 5.2 - Ambiente de programa&ccedil;&atilde;o no Linux
+
+No Linux minha recomenda&ccedil;&atilde;o &eacute; para uso dos pacotes da distribui&ccedil;&atilde;o.
+
+Evite usar o Xampp no Linux. J&aacute; que est&aacute; no Linux, que tal usar seus recursos para teu benef&iacute;cio?
+
+Instalando os pacotes da dist</pre>'><a href='Linux/Pacotes..txt'><img src='Linux/index.html@i=text'/> Pacotes..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.85KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='Linux/index.html@Li9UZXJtaW5hbA==.html'><img src='Linux/index.html@i=folder'/> Terminal</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 08:46:34</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Replicar Monitores no Mint
+
+Para que a ela de um monitor apare&ccedil;a para outro ligado ao mesmo micro.
+ 
+Menu
+Prefer&ecirc;ncias
+Monitor
+Espenhar monitores
+</pre>'><a href='Linux/ReplicarMonitores.txt'><img src='Linux/index.html@i=text'/> ReplicarMonitores.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>148B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Linux/index.php.html'><img src='Linux/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Virtual Host no ubuntu/Debian com Apache2
+
+Adaptado de:
+https://www.vivaolinux.com.br/topico/Apache-Web-Server/virtualHost
+
+Vou criar mais um virtual host:
+/backup/www - 127.0.0.1 - backup
+
+Muito &uacute;til para quem precisa executar um site no raiz web e</pre>'><a href='Linux/virtualhost.txt'><img src='Linux/index.html@i=text'/> virtualhost.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>894B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Relatando minhas descobertas no mundo Linux
+
+Lembrando que n&atilde;o existe uma distribui&ccedil;&atilde;o linux perfeita sob encomenda para servir de ambiente de programa&ccedil;&atilde;o para cada um de n&oacute;s. &Eacute; importane conhecer v&aacute;rias distribui&ccedil;&otilde;es e selecionar a que m</pre>'><a href='Linux/LinuxDesktop..txt'><img src='Linux/index.html@i=text'/> LinuxDesktop..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.68KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Ambiente Linux de Desenvolvimento
+
+O linux trabalha com sistemas de pacotes, onde instalamos o que for necess&aacute;rio dos reposit&oacute;rios da distribui&ccedil;&atilde;o.
+
+No caso instalaremos os pacotes do Apache com mod_rewrite, PHP com v&aacute;rias extens&otilde;es, MariaDB,</pre>'><a href='Linux/README..txt'><img src='Linux/index.html@i=text'/> README..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>873B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>## Aliases no ~/.bashrc do Linux Mint 20
+
+Para agilizar o trabalho nas tarefas mais frequentemente usadas
+
+No windows podemos converter em arquivos .bat
+
+nano .bashrc
+```php
+alias cw=&#039;cd /backup/www/laravel&#039;
+alias cpu=&#039;cd /backup/backup_github/public</pre>'><a href='Linux/aliases..txt'><img src='Linux/index.html@i=text'/> aliases..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>882B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Rela&ccedil;&atilde;o de scripts para agilizar as tarefas
+nas tarefas mais frequentemente usadas
+
+Para todos os que n&atilde;o requerem par&acirc;metro uso um alias
+Para os que precisam de par&acirc;metro uso script com $1, $3, ...
+
+ubin
+sudo nano /usr/local/bin/ubin
+sudo nano </pre>'><a href='Linux/Scripts..txt'><img src='Linux/index.html@i=text'/> Scripts..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.51KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>wget \
+     --recursive \
+     --no-clobber \
+     --page-requisites \
+     --html-extension \
+     --convert-links \
+     --restrict-file-names=windows \
+     --no-parent \
+         $1
+# sh wget https://ribafs.org
+</pre>'><a href='Linux/wget.sh'><img src='Linux/index.html@i=script'/> wget.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>215B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Linux/AmbienteLinux.html'><img src='Linux/index.html@i=file'/> AmbienteLinux</a></td>
+                                                
+                                <td>File</td>
+                                <td>871B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

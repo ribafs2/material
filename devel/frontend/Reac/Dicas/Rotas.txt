@@ -1,0 +1,36 @@
+Definimos o componente App, que servirá como componente raiz/principal da nossa aplicação. Dentro do componente App, utilizamos o componente BrowserRouter, que é responsável por tratar do roteamento e manipulação do histórico de nosso app.
+
+Dentro dele temos o Routes e o Route
+
+Exemplo, com 3 componentes
+
+import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
+import Home from './components/Home';
+import About from './components/About';
+import Contact from './components/Contact';
+
+function App() {
+  return (
+    <BrowserRouter>
+      <nav>
+        <ul>
+          <li> <Link to="/">Home</Link> </li>
+          <li> <Link to="/about">About</Link> </li>
+          <li> <Link to="/contact">Contact</Link> </li>
+        </ul>
+      </nav>
+
+      <main>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+        </Routes>
+      </main>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+
+

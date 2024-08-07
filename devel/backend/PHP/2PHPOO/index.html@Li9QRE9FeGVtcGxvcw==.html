@@ -1,0 +1,697 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+        
+<style>
+a:link {
+  color: red;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: green;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: black;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+a:active {
+  color: yellow;
+  background-color: transparent;
+  text-decoration: underline;
+}
+</style>         
+	</head>
+    <body style="font-size: 15px;">
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li8yUEhQT08=.html'>Ribamar FS - Material Bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9Qb3B1bGFyQ29tYm8='><img src='PDOExemplos/index.html@i=folder'/> PopularCombo</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9QYWdpbmFjYW8='><img src='PDOExemplos/index.html@i=folder'/> Paginacao</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9wZG9fY3J1ZA=='><img src='PDOExemplos/index.html@i=folder'/> pdo_crud</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9wZG9fcHVybw=='><img src='PDOExemplos/index.html@i=folder'/> pdo_puro</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9wZG9fYnNfcGFnX2J1c2Nh'><img src='PDOExemplos/index.html@i=folder'/> pdo_bs_pag_busca</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9jcnVkLXBkby1zcWxpdGU='><img src='PDOExemplos/index.html@i=folder'/> crud-pdo-sqlite</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Par&acirc;metros do PDO
+
+Inteiros
+PDO::PARAM_INT
+
+Strings
+PDO::PARAM_STR
+
+Strings de tamanho 12
+PDO::PARAM_STR, 12
+
+Boolean
+PDO::PARAM_BOOL
+
+Nulos
+PDO::PARAM_NULL
+
+
+Rela&ccedil;&atilde;o de glyphicons:
+https://www.w3schools.com/bootstrap/bootstrap_ref_comp_glyphs.a</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/params.txt'><img src='PDOExemplos/index.html@i=text'/> params.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>253B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/PDOApostila.pdf'><img src='PDOExemplos/index.html@i=file'/> PDOApostila.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>194.92KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9jcnVkLXNpbXBsZXMtcGRv'><img src='PDOExemplos/index.html@i=folder'/> crud-simples-pdo</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://www.youtube.com/watch?v=etRFu_eJ3vU&amp;list=PLbXvLovKLUIkE78UNFE8UpfOtoDlrpQec
+https://www.youtube.com/watch?v=KlIL63MeyMY&amp;list=PLHz_AreHm4dmGuLII3tsvryMMD7VgcT7x
+https://www.youtube.com/watch?v=GuycNRh2Glo&amp;list=PLm-iyl3UXUXaAjeJdG6_tjaSlJuHOXSN</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/Referencias.txt'><img src='PDOExemplos/index.html@i=text'/> Referencias.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>825B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9jcnVkX3Bkb19hamF4'><img src='PDOExemplos/index.html@i=folder'/> crud_pdo_ajax</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9wZG8tY3J1ZC1iczI='><img src='PDOExemplos/index.html@i=folder'/> pdo-crud-bs2</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9wZG9fY3J1ZF9yaWJhZnM='><img src='PDOExemplos/index.html@i=folder'/> pdo_crud_ribafs</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9wZG8tY3J1ZA=='><img src='PDOExemplos/index.html@i=folder'/> pdo-crud</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Temos uma listagem com registros de uma tabela relacionada com outra
+Exemplo: vendas que listas produtos vendidos. Neste caso aparecem os IDs dos produtos
+E gostaria de mostrar a descri&ccedil;&atilde;o de cada produto ao in v&eacute;s do ID
+
+$results = $pdo-&gt;prepare(</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/MostrarDescricao.txt'><img src='PDOExemplos/index.html@i=text'/> MostrarDescricao.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.13KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/index.php'><img src='PDOExemplos/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.71KB</td>
+                                <td>2024-05-22 07:37:04</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9wZG9fY3J1ZF9saW1wbw=='><img src='PDOExemplos/index.html@i=folder'/> pdo_crud_limpo</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>-CodigosErro
+-Conexoes
+-Conversao
+-crud-pdo
+-crud_pdo_ajax
+-crud-pdo-sqlite
+-crud-simples-pdo
+-Dicas
+-Paginacao
+-pdo_bs
+-pdo_bs_auto
+-pdo_bs_pag_busca
+-pdo-crud
+-pdo_crud
+-pdo-crud-bs
+-pdo-crud-bs2
+-pdo-crud-bsOK
+-pdo_crud_limpo
+-pdo_crud_ribafs
+-pdo</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/PDO.txt'><img src='PDOExemplos/index.html@i=text'/> PDO.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>410B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/debugPDO.php'><img src='PDOExemplos/index.html@i=file'/> debugPDO.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.83KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9UZXN0YWRvcw=='><img src='PDOExemplos/index.html@i=folder'/> Testados</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 08:53:56</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9EaWNhcw=='><img src='PDOExemplos/index.html@i=folder'/> Dicas</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9wZG9fYnNfYXV0bw=='><img src='PDOExemplos/index.html@i=folder'/> pdo_bs_auto</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9Db2RpZ29zRXJybw=='><img src='PDOExemplos/index.html@i=folder'/> CodigosErro</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 12:12:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>PDO provides support for transactions. Borrowing the code from step 9, we can wrap the INSERT series of commands into a transactional block:
+
+try {
+    $pdo-&gt;beginTransaction(); // Iniciar a transa&ccedil;&atilde;o
+    $sql = &quot;INSERT INTO customer (&#039;&quot;
+    . impl</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/transacoes.txt'><img src='PDOExemplos/index.html@i=text'/> transacoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.46KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9wZG8tY3J1ZC1ic09L'><img src='PDOExemplos/index.html@i=folder'/> pdo-crud-bsOK</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Par&acirc;metros do PDO
+
+Inteiros
+PDO::PARAM_INT
+
+Strings
+PDO::PARAM_STR
+
+Strings de tamanho 12
+PDO::PARAM_STR, 12
+
+Boolean
+PDO::PARAM_BOOL
+
+Nulos
+PDO::PARAM_NULL
+
+
+Para melhorar a seguran&ccedil;a configure
+$dbh-&gt;setAttribute(PDO::ATTR_EMULATE_PREPARES, false)</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/atributos.txt'><img src='PDOExemplos/index.html@i=text'/> atributos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.14KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+    // Fun&ccedil;&atilde;o que popula uma combo com os registros de uma tabela, para campos insert e para campos update
+    public function combo($sql, $selected=null){ // $sql=&#039;select id,descricao from produtos&#039;
+        $smt = $this-&gt;pdo-&gt;prepare($sql);      </pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/Funcoes.txt'><img src='PDOExemplos/index.html@i=text'/> Funcoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.17KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9wZG9fYnM='><img src='PDOExemplos/index.html@i=folder'/> pdo_bs</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9Db25leG9lcw=='><img src='PDOExemplos/index.html@i=folder'/> Conexoes</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 12:12:24</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9jcnVkLXBkbw=='><img src='PDOExemplos/index.html@i=folder'/> crud-pdo</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># PDO - PHP Document Object
+
+https://www.php.net/manual/en/book.pdo.php
+
+PDO &eacute; a biblioteca de conex&atilde;o com bancos de dados mais usados atualmente com PHP.
+
+S&atilde;o v&aacute;rios os SGBDs contemplados pelo PDO atualmente:
+```php
+    CUBRID (PDO)
+    MS SQL S</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/README.txt'><img src='PDOExemplos/index.html@i=text'/> README.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.9KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9Db252ZXJzYW8='><img src='PDOExemplos/index.html@i=folder'/> Conversao</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 12:12:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/PDOExemplos.zip'><img src='PDOExemplos/index.html@i=compressed'/> PDOExemplos.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>5.04MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/crud.php'><img src='PDOExemplos/index.html@i=file'/> crud.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.3KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/PDOExemplos/?Li9wZG8tY3J1ZC1icw=='><img src='PDOExemplos/index.html@i=folder'/> pdo-crud-bs</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

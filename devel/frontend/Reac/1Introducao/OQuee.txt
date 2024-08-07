@@ -1,0 +1,19 @@
+React parece estar em toda parte.
+
+Em vez disso, React se destaca precisamente porque minimiza a quantidade de React-conhecimento específico que você precisa.
+
+Você não precisa aprender sobre templates ou controladores ou padrões complexos. Em vez disso, a maior parte do código que você escreve será JavaScript combinado com HTML padrão.
+
+React é uma estrutura JavaScript popular para criar aplicativos front-end.
+
+Inserir valores em atributos de Tags
+
+Ele não é um framework completo, mas apenas uma biblioteca que precisa de outras bibliotecas para trabalhr, cmo:
+- routes
+- redux
+
+Pode ser usado em:
+
+- mobile
+- desktop
+- 

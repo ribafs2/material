@@ -1,0 +1,758 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li8yUEhQT08=.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Conven&ccedil;&otilde;es diversas
+
+Nomes de arquivos em php
+
+   PHP Project        ║   Classes   ║  Methods   ║  Properties  ║ Functions  ║ Variables 
+Symfony Framework     ║ PascalCase  ║ camelCase  ║ camelCase    ║ camelCase  ║ camelCase  </pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/Convencoes.txt'><img src='BoasPraticas/index.html@i=text'/> Convencoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.12KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+hashs de senha
+
+filtro de dados de formul&aacute;rios no front e no backend
+
+filter_var() e filter_imput() s&atilde;o &oacute;timas
+
+valida&ccedil;&otilde;es
+
+
+</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/seguranca.txt'><img src='BoasPraticas/index.html@i=text'/> seguranca.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>131B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Obrigado ao grupo do PHP-FIG (https://www.php-fig.org/)  pelos autoloads.
+
+c&oacute;digo bem organizado, em diret&oacute;rios claros, com nomes seguindo os bons padr&otilde;es
+
+Cada classe lida somente com um &uacute;nico assunto. Similar ao que acontece com tabelas de banc</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/BoasPraticas3.txt'><img src='BoasPraticas/index.html@i=text'/> BoasPraticas3.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.2KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Frameworks
+Em vez de reinventar a roda, muitos desenvolvedores PHP usam frameworks para construir aplica&ccedil;&otilde;es web. Os frameworks abstraem muitas das preocupa&ccedil;&otilde;es de baixo n&iacute;vel e fornecem interfaces &uacute;teis e f&aacute;ceis de utilizar para completar tar</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/frameworks.txt'><img src='BoasPraticas/index.html@i=text'/> frameworks.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.38KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Operadores Tern&aacute;rios
+
+O uso de operadores tern&aacute;rios &eacute; uma &oacute;tima forma de condensar seu c&oacute;digo, mas eles s&atilde;o geralmente usados em excesso. Apesar de opera&ccedil;&otilde;es tern&aacute;rias poderem ser agrupadas e aconselhado usar uma por linha para aumentar a le</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/op-ternarios.txt'><img src='BoasPraticas/index.html@i=text'/> op-ternarios.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.04KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>- Use ap&oacute;strofos (&#039;) ao inv&eacute;s de aspas (&quot;) para delimitar strings, pois s&atilde;o mais r&aacute;pidos e mais seguros
+
+- Use sempre que poss&iacute;vel a visibilidade private, que &eacute; mais segura. Na ordem do mais seguro para o menos:
+private
+protected
+public
+
+- Arqu</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/Recomendacoes.txt'><img src='BoasPraticas/index.html@i=text'/> Recomendacoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.44KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>A Sintaxe Heredoc se comporta internamente da mesma forma que as aspas duplas exceto que &eacute; adequada para o uso de strings de m&uacute;ltiplas linhas sem a necessidade de concatena&ccedil;&atilde;o.
+
+&lt;?php
+$a = &#039;Variables&#039;;
+
+$str = &lt;&lt;&lt;EOD             // iniciada por &lt;</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/heredoc.txt'><img src='BoasPraticas/index.html@i=text'/> heredoc.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.44KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Boas pr&aacute;ticas ao programar
+
+Conven&ccedil;&otilde;es/Boas pr&aacute;ticas
+
+Nomes de tabelas:
+- Tudo em min&uacute;sculas
+- No plural
+- Palavras compostas, separadas por sublinhado
+Exs: customers, pedido_itens
+
+Nomes de classes, m&eacute;todos e propriedades:
+
+- Classes: CamelCas</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/Boas%20praticas%20ao%20programar.txt'><img src='BoasPraticas/index.html@i=text'/> Boas praticas ao programar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>16.55KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>It&#039;s time for a few more tips to make your code clean and readable :)
+Let&#039;s dive right in.
+
+
+Tip #1: use strict comparison
+
+The standard &quot;loose&quot; comparison operator (==) can be confusing.
+For example:
+
+$a = TRUE;
+$b = 12;
+
+if ($a == $b)
+{
+   echo &ldquo;</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/CleanCode.txt'><img src='BoasPraticas/index.html@i=text'/> CleanCode.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.69KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Na PSR diz que fun&ccedil;&otilde;es estruturais (leia-se fun&ccedil;&atilde;o fora de classes) devem seguir o padr&atilde;o snake_case, assim como o pr&oacute;prio PHP.
+M&eacute;todos (leia-se fun&ccedil;&otilde;es em classes) devem usar o padr&atilde;o camelCase.
+Por fim, classes e name spaces devem usar o </pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/PSRLaravel.txt'><img src='BoasPraticas/index.html@i=text'/> PSRLaravel.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>303B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Testes
+Escrever testes automatizados para o seu c&oacute;digo PHP &eacute; considerado uma boa pr&aacute;tica, e leva a aplica&ccedil;&otilde;es bem escritas. Testes automatizados s&atilde;o uma excelente ferramenta para garantir que sua aplica&ccedil;&atilde;o n&atilde;o ir&aacute; quebrar quando voc&ecirc; estiv</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/testes.txt'><img src='BoasPraticas/index.html@i=text'/> testes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>689B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Declara&ccedil;&atilde;o de Vari&aacute;veis
+
+As vezes programadores tentam tornar seu c&oacute;digo mais limpo declarando vari&aacute;veis predefinidas com um nome diferente. O que isso faz na realidade e dobrar o consumo de mem&oacute;ria do script. No exemplo abaixo, digamos que uma</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/variaveis.txt'><img src='BoasPraticas/index.html@i=text'/> variaveis.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>674B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Erros e Exce&ccedil;&otilde;es
+Erros
+Em muitas linguagens de programa&ccedil;&atilde;o que fazem o uso generalizado das exce&ccedil;&otilde;es, sempre que algo d&aacute; errado uma exce&ccedil;&atilde;o &eacute; lan&ccedil;ada. Esta &eacute; certamente uma forma vi&aacute;vel de fazer as coisas, mas o PHP &eacute; uma linguagem que </pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/erros.txt'><img src='BoasPraticas/index.html@i=text'/> erros.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.83KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&bull; Os arquivos DEVEM usar apenas tags &lt;?php e ?&gt; e &lt;?= e ?&gt;.
+&bull; Os arquivos DEVEM usar apenas UTF-8 sem BOM para c&oacute;digo PHP.
+&bull; Os arquivos DEVEM declarar s&iacute;mbolos (classes, fun&ccedil;&otilde;es, constantes, etc.) ou causar efeitos colaterais (por exemplo,</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/psrs.txt'><img src='BoasPraticas/index.html@i=text'/> psrs.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>9.79KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># PHP Moderno
+```html
+Composer
+Namespace
+Git
+GitHub, GitLab, BitBucket e Packagist
+PSRs - http://www.php-fig.org/
+XDebug
+Try catch
+In&uacute;meros pacotes dispon&iacute;veis/componentes: Whoops, Migrations (Phinx)
+VSCode
+PHPUnit
+phpDoc
+PHPCodeSniffer
+Padr&otilde;es de</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/PHPModern.txt'><img src='BoasPraticas/index.html@i=text'/> PHPModern.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.15KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Namespace Global
+
+Quando estiver usando namespaces voc&ecirc; pode reparar que fun&ccedil;&otilde;es internas ficam escondidas por fun&ccedil;&otilde;es que voc&ecirc; mesmo escreveu. Para corrigir isso refira a fun&ccedil;&otilde;es globais atrav&eacute;s do uso de uma contra-barra antes do nome da f</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/namespace.txt'><img src='BoasPraticas/index.html@i=text'/> namespace.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>722B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Algumas Boas Pr&aacute;ticas de Programa&ccedil;&atilde;o
+
+- Planejamento antes de iniciar o banco e o c&oacute;digo
+- Nunca escrever um crud em um &uacute;nico arquivo
+- Orienta&ccedil;&atilde;o a objetos e MVC
+	- Sempre que poss&iacute;vel use heran&ccedil;a, assim divide suas classes em classes men</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/BoasPraticas5.txt'><img src='BoasPraticas/index.html@i=text'/> BoasPraticas5.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>516B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>PHPDoc
+PHPDoc &eacute; um padr&atilde;o informal para comentar c&oacute;digo PHP. H&aacute; um monte de diferentes tags dispon&iacute;veis. A lista completa de tags e exemplos podem ser encontrados no Manual do PHPDoc.
+Abaixo est&aacute; um exemplo de como voc&ecirc; pode documentar uma cla</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/phpdoc.txt'><img src='BoasPraticas/index.html@i=text'/> phpdoc.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.4KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Criar um bom software &eacute; dif&iacute;cil. Envolve levar em considera&ccedil;&atilde;o todos os aspectos do aplicativo que voc&ecirc; precisa para construir, e &eacute; ainda mais complicado pela necessidade de ser espec&iacute;fico o suficiente para suas necessidades atuais para obter </pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/bons_softwares.txt'><img src='BoasPraticas/index.html@i=text'/> bons_softwares.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>474B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/RazoesPHPMelhor.pdf'><img src='BoasPraticas/index.html@i=file'/> RazoesPHPMelhor.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>36.02KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/index.php'><img src='BoasPraticas/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Lista de Boas Pr&aacute;ticas do desenvolvedor moderno.
+##Fluxo de desenvolvimento
+    1. Crie um novo branch no seu reposit&oacute;rio local. 
+    2. Implemente suas mudan&ccedil;as 
+    3. Fa&ccedil;a um push do seu branch para o reposit&oacute;rio remoto 
+    4. Submeta um Pul</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/GitBoasPraticas.txt'><img src='BoasPraticas/index.html@i=text'/> GitBoasPraticas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>602B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Usar character set utf8mb4
+
+
+</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/bancoadados.txt'><img src='BoasPraticas/index.html@i=text'/> bancoadados.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>29B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Templates
+Os templates fornecem uma forma conveniente de separar seu controlador e a camada de dom&iacute;nio da sua camada de apresenta&ccedil;&atilde;o.
+Eles cont&eacute;m geralmente o HTML de sua aplica&ccedil;&atilde;o, mas tamb&eacute;m podem ser usados para outros formatos, como o XML.</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/templates.txt'><img src='BoasPraticas/index.html@i=text'/> templates.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.34KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&lt;?php
+$answer = test(2);    // tanto o c&oacute;digo para o &#039;case 2&#039; quanto para o &#039;case 3&#039; ser&aacute; executado
+
+function test($a)
+{
+    switch ($a) {
+        case 1:
+            // c&oacute;digo...
+            break;             // break &eacute; usado para terminar a es</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/switch.txt'><img src='BoasPraticas/index.html@i=text'/> switch.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>584B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&lt;?php
+function test($a)
+{
+    if ($a) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+// vs
+
+function test($a)
+{
+    if ($a) {
+        return true;
+    }
+    return false;    // else n&atilde;o &eacute; necess&aacute;rio
+}
+
+
+</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/else.txt'><img src='BoasPraticas/index.html@i=text'/> else.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>226B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Boas Pr&aacute;ticas
+
+Adotar boas e consagradas pr&aacute;ticas juntamente com bons padr&otilde;es de projeto.
+
+- Estilos de codifica&ccedil;&atilde;o
+
+Uma &oacute;tima ferramenta &eacute; o Visual Studio Code com suas v&aacute;rias extens&otilde;es.
+Uma delas &eacute; o 
+phpfmt &ndash; PHP formatter
+- Basta sele</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/Boaspraticas.txt'><img src='BoasPraticas/index.html@i=text'/> Boaspraticas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>32KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Quando usamos o comando echo ele n&atilde;o retorna nada, j&aacute; o comando print sempre ir&aacute; retornar o valor 1. Por este motivo o comando echo vai ser ligeiramente mais r&aacute;pido.
+
+A melhor op&ccedil;&atilde;o &eacute; echo porque economizar&aacute; um byte no tamanho do arquivo do s</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/echo-print.txt'><img src='BoasPraticas/index.html@i=text'/> echo-print.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.11KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/?Li9jbGVhbi1jb2RlLXBocA=='><img src='BoasPraticas/index.html@i=folder'/> clean-code-php</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 08:53:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Algumas Boas Pr&aacute;ticas de Programa&ccedil;&atilde;o
+
+- Planejamento antes de iniciar o banco e o c&oacute;digo
+- Nunca escrever um crud em um &uacute;nico arquivo
+- Orienta&ccedil;&atilde;o a objetos e MVC
+	- Sempre que poss&iacute;vel use heran&ccedil;a, assim divide suas classes em classes men</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/BoasPraticas4.txt'><img src='BoasPraticas/index.html@i=text'/> BoasPraticas4.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>516B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&lt;?php
+$a  = &#039;Multi-line example&#039;;    // operador de concatena&ccedil;&atilde;o e atribui&ccedil;&atilde;o (.=)
+$a .= &quot;\n&quot;;
+$a .= &#039;of what not to do&#039;;
+
+vs.
+
+$a = &#039;Multi-line example&#039;      // operador de concatena&ccedil;&atilde;o (.)
+    . &quot;\n&quot;                     // indentando novas li</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/strings.txt'><img src='BoasPraticas/index.html@i=text'/> strings.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>280B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Aspas Simples
+
+As aspas simples s&atilde;o utilizadas para indicar uma &lsquo;string literal&rsquo;. Strings literais n&atilde;o tentam analisar ou processar caracteres especiais ou vari&aacute;veis.
+
+Se estiver usando aspas simples, voc&ecirc; pode digitar um nome de vari&aacute;vel em</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/aspas.txt'><img src='BoasPraticas/index.html@i=text'/> aspas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.27KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Today I&#039;m sharing with you 9 steps to create your PHP applications from scratch.
+Let&#039;s dive in.
+
+
+1. Start from the problem (not the code).
+
+Let&#039;s say that you decided to build a music database portal.
+
+A common mistake is to start the project design</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/CriarAplicativos.txt'><img src='BoasPraticas/index.html@i=text'/> CriarAplicativos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>5.78KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Boas Pr&aacute;ticas
+
+Adotar boas e consagradas pr&aacute;ticas juntamente com bons padr&otilde;es de projeto.
+
+- Estilos de codifica&ccedil;&atilde;o
+
+Uma &oacute;tima ferramenta &eacute; o Visual Studio Code com suas v&aacute;rias extens&otilde;es.
+Uma delas &eacute; o 
+phpfmt &ndash; PHP formatter
+- Basta sele</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/BoasPraticas/Boaspraticas2.txt'><img src='BoasPraticas/index.html@i=text'/> Boaspraticas2.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>32.27KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,123 @@
+Exemplos de componentes
+
+Criando e aninhando componentes
+
+Os aplicativos React são feitos de componentes. Um componente é uma parte da interface do usuário (interface do usuário) que possui sua própria lógica e aparência. Um componente pode ser tão pequeno quanto um botão ou tão grande quanto uma página inteira.
+
+Divide aplicação em pastes. A ideia é que o arquivo central App.js tenha pouco código e agrege outros componentes.
+
+Exporta onde ele nasce e importa para onde ele vai
+
+Normalmente ficam em uma pasta chamada components
+
+Geralmente o componente dá seu nome para a função do arquivo
+
+HelloWorld.js - function HelloWorld (){}
+
+Retorna um bot]ao
+
+function MyButton() {
+  return (
+    <button>I'm a button</button>
+  );
+}
+
+
+Criando e aninhando componentes
+
+function MyButton() {
+  return (
+    <button>
+      I'm a button
+    </button>
+  );
+}
+
+export default function MyApp() {
+  return (
+    <div>
+      <h1>Welcome to my app</h1>
+      <MyButton />
+    </div>
+  );
+}
+
+
+App.jsx será o primeiro React Component do seu aplicativo.
+
+src/App.jsx
+
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from '/vite.svg'
+import './App.css'
+
+function App() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div className="App">
+    	<h1>Olá Mundo</h1>
+    </div>
+  )
+}
+
+export default App
+
+Um aplicativo construído usando React, ou um dos outros frameworks para o frontend populares frameworks como Vue e Svelte, por exemplo, é construído usando dezenas de
+componentes.
+
+Mas vamos começar analisando esse primeiro componente. vou simplificar esse código de componente:
+
+import React from 'react'
+import logo from './logo.svg'
+import './App.css'
+
+function App() {
+    return /* something */
+}
+export default App
+
+
+Você pode ver algumas coisas aqui. Importamos algumas coisas e exportamos um função chamada App. As coisas que importamos neste caso são uma biblioteca JavaScript (o
+reagir npm pacote), uma imagem SVG e um arquivo CSS.
+
+create-react-app
+
+Está configurado de uma forma que nos permite importar imagens e CSS para usar em nosso JavaScript, mas isso não é algo que você precisa se importar sobre Agora.
+
+App é uma função que no exemplo original retorna algo que a princípio bastante estranho. Parece HTML, mas tem algum JavaScript embutido nele.
+
+ Isso é JSX, uma linguagem especial que usamos para construir a saída de um componente. Bem fale mais sobre JSX na próxima seção. Além de definir algum JSX para retornar, um componente possui várias outros características.
+
+
+Um componente pode ter seu próprio estado, o que significa que ele encapsula alguns variáveis que outros componentes não podem acessar, a menos que este componente exponha este estado para o resto da aplicação.
+
+Um componente também pode receber dados de outros componentes. Neste caso, nós iremos falar sobre adereços.
+
+Não se preocupe, veremos detalhadamente todos esses termos (JSX, State e Adereços) em breve.
+
+
+Children
+
+import React from 'react'
+import logo from './logo.svg'
+import './App.css'
+
+function WelcomeMessage() {
+    'return <p>Welcome!</p>
+}
+
+function App() {
+
+We say WelcomeMessage is a child component of App, and Appis its parent component.
+
+We're adding the
+
+<WelcomeMessage />
+
+component as if it was part of the
+
+HTML language.
+
+

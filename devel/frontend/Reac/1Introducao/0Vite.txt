@@ -1,0 +1,105 @@
+Forma mais mooderna
+
+Instalar Vite
+yarn create vite
+
+Criar aplicativo
+npm create vite@latest testes -- --template react
+
+npm create vite@latest vite command | my-react-app project name | template
+
+Instalar com o react-router-dom
+
+npm install react-router-dom
+
+
+Requisitos
+
+node --version
+v18.4.0
+yarn --version
+1.22.19
+
+
+Usando vite
+
+yarn create vite
+
+Abrirá menu
+
+✔ Project name: … appName
+Select react as the framework (use the up and down keys to navigate between options):
+
+✔ Select a framework: › react
+Add TypeScript by selecting react-ts:
+
+✔ Select a variant: › react-ts
+
+cd appName
+
+
+Destes acima o método mais rápido é usando Vite
+
+Instalar deendências
+
+yarn
+
+ou
+yarn install
+
+Abrir no aplicativo
+
+yarn run dev
+
+yarn run dev --host
+
+
+Alternativa
+
+Criar um template inicial
+
+yarn create vite appName --template react-ts
+
+cd appName
+yarn install
+yarn run dev
+
+
+ls src/
+
+nano src/App.jsx
+
+yarn run dev --host
+
+mkdir src/components
+
+nano src/components/Welcome.jsx
+
+export default function Welcome() {
+return (
+<>
+<div className="wrapper">
+<h1>Welcome To My App</h1>
+<p>This is going to be the coolest app in the world!</p>
+</div>
+</>
+);
+}
+
+nano src/App.jsx
+
+import Welcome from "./components/Welcome"
+
+export default function App() {
+return (
+<>
+<Welcome />
+</>
+)
+}
+
+mkdir src/img
+
+cd src/img
+
+

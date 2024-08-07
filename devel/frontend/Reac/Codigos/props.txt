@@ -1,0 +1,70 @@
+props
+
+Exemlo passando parâmetro
+
+import React from 'react'
+
+const WelcomeMessage = (props) =>{
+    return <h1>Bem-vindo, {props.name}!</h1>
+}
+
+const App = () =>{
+    return (
+        <div>
+            <WelcomeMessage name = "João" />
+        </div>
+    )
+}
+
+export default App;
+------------
+
+import React from 'react'
+
+function App(){
+    const name = 'Matheus'
+    const newName = name.toUpperCase()
+
+    function sum(a,b){
+        return a + b
+    }
+
+    return(
+        <div className="App">
+            <h2>Alterando o jSX</h2>
+            <p>Olá, {newName}</p>
+            <p>Soma: {sum(2,3)}</p>
+        </div>
+    )
+}
+export default App;
+
+
+
+function WelcomeMessage() {
+    return <p>Welcome!</p>
+}
+
+<WelcomeMessage />
+
+<WelcomeMessage myprop={'somevalue'} />
+
+function WelcomeMessage(props) {
+    return <p>Welcome!</p>
+}
+
+function WelcomeMessage({ myprop }) {
+    return <p>Welcome!</p>
+}
+
+function WelcomeMessage({ myprop }) {
+    return <p>{myprop}</p>
+}
+
+<WelcomeMessage> Here is some message </WelcomeMessage>
+
+function WelcomeMessage({ children }) {
+    return <p>{children}</p>
+}
+
+https://flaviocopes.com/fix-uncaught-error-objects-are-not-valid-as-a-react-child/

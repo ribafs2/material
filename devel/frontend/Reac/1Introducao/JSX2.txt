@@ -1,0 +1,9 @@
+JSX?
+Writing JavaScript/React code to describe what the user interface (UI) will look like is not as simple as you may think. This makes the React author create what looks like a JavaScript version of HTML. This is called JSX (JavaScript XML). It is an XML like syntax extension to JavaScript that makes it easier and more intuitive to describe the UI.
+
+Under the hood, the JSX is being translated to regular JavaScript version of itself at runtime since the browser can’t read it.
+
+    • You can use a valid JavaScript expression inside the JSX through curly braces, {}.
+    • In JSX, elements attributes, event handlers are always in camelCase. The few exceptions are aria-* and data-* attributes, which are lowercase.
+
+

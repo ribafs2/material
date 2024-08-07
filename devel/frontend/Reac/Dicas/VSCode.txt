@@ -1,0 +1,7 @@
+O VSCode ajuda inclusive a debugar
+
+Tanto em seu editor
+
+Quanto em seu terminal
+
+

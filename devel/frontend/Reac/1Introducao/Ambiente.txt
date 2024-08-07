@@ -1,0 +1,7 @@
+Node 16 ou 18
+
+Yarn
+
+VSCode
+
+

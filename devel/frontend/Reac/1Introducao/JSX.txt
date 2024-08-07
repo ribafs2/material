@@ -1,0 +1,100 @@
+No JSX podemos ter aenas um único elemento pai
+
+Se tiver
+
+<div>
+
+Precisamoos ter
+
+</dv>
+
+Para wrapper o conteúdo
+
+function AboutPage() {
+  return (
+    <>
+
+    </>
+  );
+}
+
+Tudo acima é react
+
+function AboutPage() {
+  return (
+    <>
+      <h1>About</h1>
+      <p>Hello there.<br />How do you do?</p>
+    </>
+  );
+}
+
+Agora as duas linhas de HTML formam um JSX
+
+
+Adicionar CSS
+
+<style>
+/* In your CSS */
+.avatar {
+  border-radius: 50%;
+}
+</style>
+
+return (
+  <h1>
+    {user.name}
+  </h1>
+);
+
+return (
+  <img
+    className="avatar"
+    src={user.imageUrl}
+  />
+);
+
+Não podemos usar class="name" no react, mas classNome=""
+
+Condicional
+
+let content;
+if (isLoggedIn) {
+  content = <AdminPanel />;
+} else {
+  content = <LoginForm />;
+}
+return (
+  <div>
+    {content}
+  </div>
+);
+
+import { useState } from 'react';
+
+export default function MyApp() {
+  return (
+    <div>
+      <h1>Counters that update separately</h1>
+      <MyButton />
+      <MyButton />
+    </div>
+  );
+}
+
+function MyButton() {
+  const [count, setCount] = useState(0);
+
+  function handleClick() {
+    setCount(count + 1);
+  }
+
+  return (
+    <button onClick={handleClick}>
+      Clicked {count} times
+    </button>
+  );
+}
+
+
+

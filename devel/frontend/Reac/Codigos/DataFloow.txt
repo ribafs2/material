@@ -1,0 +1,14 @@
+Como os dados caminham no React
+
+Em um aplicativo React, os dados normalmente fluem de um componente pai para um componente filho, usando para isso props.
+
+Exemploo de props
+
+<WelcomeMessage myprop={'somevalue'} />
+
+Se você passar uma função para o componente filho, poderá alterar o estado do componente pai de um componente filho:
+
+const [count, setCount] = useState(0)
+<Counter setCount={setCount} />
+
+https://flaviocopes.com/fix-uncaught-error-objects-are-not-valid-as-a-react-child/

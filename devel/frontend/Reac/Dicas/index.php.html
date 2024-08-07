@@ -1,0 +1,663 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../../index.php@Li9SZWFj.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Nomes de componentes sejam com letras mei&uacute;sculas, para n&atilde;o serem confundidos coom as tags do HTML que s&atilde;o sempre com min&uacute;sculas.
+
+Os nomes seguindo 
+
+camelCase para vari&aacute;veis
+
+CamelCase para classes/fun&ccedil;&otilde;es
+
+Mas os nomes de arquivos dos projet</pre>'><a href='Convencoes.txt'><img src='index.php@i=text'/> Convencoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.69KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre></pre>'><a href='Router5e6.txt'><img src='index.php@i=text'/> Router5e6.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>0B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>O React, resumidamente, &eacute; uma biblioteca para constru&ccedil;&atilde;o de interfaces, muito utilizado em Single Page Applications (SPA),
+
+Sim, o HTML, CSS, comportamentos&hellip;toda a interface &eacute; codificada usando somente JavaScript.
+
+A primeira vantagem &eacute; a orga</pre>'><a href='React.txt'><img src='index.php@i=text'/> React.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>475B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Uma promise &eacute; uma constru&ccedil;&atilde;o do JavaScript que representa um valor futuro desconhecido (apenas a &quot;promessa&quot; de um valor). Por conceito, uma promise &eacute; apenas o JavaScript &quot;prometendo&quot; retornar um valor.
+
+
+</pre>'><a href='Promise.txt'><img src='index.php@i=text'/> Promise.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>208B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>O mais importante de um projeto react &eacute; o conte&uacute;do da asta
+
+No raiz do apllicativo criado icam:
+
+/public
+/src
+index.html
+package.json
+vite.config.js
+.eslintrc.cjs
+.gitignore
+
+Depois de rodar npm install a pasta nodde_modules &eacute; criada com as deepen</pre>'><a href='EntendendEstrBasica.txt'><img src='index.php@i=text'/> EntendendEstrBasica.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.39KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Definimos o componente App, que servir&aacute; como componente raiz/principal da nossa aplica&ccedil;&atilde;o. Dentro do componente App, utilizamos o componente BrowserRouter, que &eacute; respons&aacute;vel por tratar do roteamento e manipula&ccedil;&atilde;o do hist&oacute;rico de nosso app.
+
+D</pre>'><a href='Rotas.txt'><img src='index.php@i=text'/> Rotas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.01KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>npm install --save @ant-design/icons
+
+npm i @ant-design/icons
+
+npm install react-router-dom
+</pre>'><a href='Dependencias.txt'><img src='index.php@i=text'/> Dependencias.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>92B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>17
+
+index.js
+No index.js: import App from &quot;./App&quot;;
+
+18
+
+
+
+create-react-app
+
+Componentes, App, main tudo com js
+
+Vite
+
+Componentes, App, main tudo com jsx
+
+src/ vem com assetc
+</pre>'><a href='Diferencas17e18.txt'><img src='index.php@i=text'/> Diferencas17e18.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>175B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Estrutura de arquivos padr&atilde;o
+
+Agora, vamos ver como eu estruturo meus projetos React utilizando Vite.
+
+.
+├── 📁 public
+│    └── // Favicon, logo, etc.
+│
+├── 📁 src
+│    ├── 📁 assets
+│    │    └── // Arq</pre>'><a href='EstruturaProjeto.txt'><img src='index.php@i=text'/> EstruturaProjeto.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.26KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/frontend/Reac/Dicas/index.php?Li9Ib29rcw=='><img src='index.php@i=folder'/> Hooks</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:05:34</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/frontend/Reac/Dicas/index.php?Li9FeHBvcnRJbXBvcnQ='><img src='index.php@i=folder'/> ExportImport</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:04:56</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>ReactJS - Styling
+In general, React allows component to be styled using CSS class through className attribute. Since, the React JSX supports JavaScript expression, a lot of common CSS methodology can be used. Some of the top options are as follows </pre>'><a href='Conceitos.txt'><img src='index.php@i=text'/> Conceitos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>753B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Liinguagem ass&iacute;ncrona
+
+O JavaScript foi idealizado como uma linguagem de programa&ccedil;&atilde;o s&iacute;ncrona.
+
+Come&ccedil;a no in&iacute;cio de um arquivo e executa linha por linha de c&oacute;digo at&eacute; chegar ao final Com isso apenas uma coisa pode acontecer a cada momento.
+
+C</pre>'><a href='Assincrona.txt'><img src='index.php@i=text'/> Assincrona.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.53KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://www.w3schools.com/react/Default.asp
+</pre>'><a href='Referencia.txt'><img src='index.php@i=text'/> Referencia.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>44B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Extens&atilde;o do react para escrever HTML e JS juntos
+
+JSX &eacute; uma sintaxe de extens&atilde;o JavaScript usada no React para escrever facilmente HTML e JavaScript juntos.
+Escrever c&oacute;digo em React leva muito tempo porque voc&ecirc; precisa usar a fun&ccedil;&atilde;o React.crea</pre>'><a href='JSX.txt'><img src='index.php@i=text'/> JSX.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>919B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Passando elementos JSX
+// define o componente Exemplo a partir de uma fun&ccedil;&atilde;o
+function Exemplo(props) {
+  return (&lt;&gt;
+    &lt;p&gt;&lt;b&gt;Categoria: {props.categoria}&lt;/b&gt;&lt;/p&gt;
+    Elementos Filhos ({props.children.length}):
+    {props.children}
+  &lt;/&gt;)     
+}   </pre>'><a href='PassandoJX.txt'><img src='index.php@i=text'/> PassandoJX.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.52KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='PropsOK.odt'><img src='index.php@i=file'/> PropsOK.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>32.08KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Podemos adicionar fun&ccedil;&otilde;es dentro de fun&ccedil;&otilde;es em javascript
+
+import Pessoa from &quot;./components/Pessoa&quot;;
+
+export default function App() {
+
+  function Maiusculas(texto){
+    return texto.toUpperCase()
+  }
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Exemplo de props&lt;</pre>'><a href='FuncaoDentroFuncao.txt'><img src='index.php@i=text'/> FuncaoDentroFuncao.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>406B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>A estrutura de arquivos gerada ap&oacute;s a instala&ccedil;&atilde;o depende do m&eacute;todo de instala&ccedil;&atilde;o.
+
+Para mostrar isso vamos agora instalar dois app usando create-react-app e Vite
+
+npx create-react-app testesr
+
+Quando este m&eacute;todo acima termina o node_modules j</pre>'><a href='Estrutura.txt'><img src='index.php@i=text'/> Estrutura.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.17KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='index.php.html'><img src='index.php@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/frontend/Reac/Dicas/index.php?Li9Qcm9wcw=='><img src='index.php@i=folder'/> Props</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:05:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>O VSCode ajuda inclusive a debugar
+
+Tanto em seu editor
+
+Quanto em seu terminal
+
+
+</pre>'><a href='VSCode.txt'><img src='index.php@i=text'/> VSCode.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>82B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Diferencia elementos, que s&atilde;o os do HTML, dos JSX, que s&atilde;o os do React, que cont&eacute;m HTML.
+
+
+</pre>'><a href='Elementos.txt'><img src='index.php@i=text'/> Elementos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>94B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/frontend/Reac/Dicas/index.php?Li9jdXJzb19yZWFjdF9qc3g='><img src='index.php@i=folder'/> curso_react_jsx</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:04:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>A briga do iniciante com as vers&otilde;es
+
+Estou iniciando em react.
+Como j&aacute; tenho experi&ecirc;ncia em outras linguagens isso talvez tenha me despertado mais cedo.
+
+Ao baixar um exemplo para testar ou pegar um tutorial e tentar seguir n&atilde;o atentamos se estam</pre>'><a href='Versoes.txt'><img src='index.php@i=text'/> Versoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.02KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/frontend/Reac/Dicas/index.php?Li9Gb3Jtcw=='><img src='index.php@i=folder'/> Forms</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:05:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>NPM
+
+npm cache clean --force
+</pre>'><a href='LimparCache.txt'><img src='index.php@i=text'/> LimparCache.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>29B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/frontend/Reac/Dicas/index.php?Li9Cb3Rhb0NsaWNhdmVs'><img src='index.php@i=folder'/> BotaoClicavel</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:04:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='IntroReactVersaoAjteriorOficial.odt'><img src='index.php@i=file'/> IntroReactVersaoAjteriorOficial.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>58.77KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/devel/frontend/Reac/Dicas/index.php?Li9Db25zdHJ1Y3Rvcg=='><img src='index.php@i=folder'/> Constructor</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:04:32</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,30 @@
+Veja um App.jsx simples
+
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from '/vite.svg'
+import './App.css'
+
+//Esta parte acima importa s arquivs auxiliares
+
+function App() { // Aqui coomeça uma React function
+  const [count, setCount] = useState(0)
+  // Corpo da função
+  return (
+    <div className="App">
+    	<h1>Olá Mundo</h1>
+    </div>
+  )
+}
+
+export default App 
+
+// Aqui o react exporta a function para que fique seu valor à disosuição, vua return/export
+
+
+Lógica
+- Importamos alguns scripts
+- Criamos uma function/lógica
+- Exportamos
+
+

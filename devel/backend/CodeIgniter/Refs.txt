@@ -1,0 +1,5 @@
+https://codeigniter.com/user_guide/index.html
+
+composer create-project codeigniter4/appstarter project-root
+
+

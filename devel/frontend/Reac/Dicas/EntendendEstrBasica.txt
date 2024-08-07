@@ -1,0 +1,75 @@
+O mais importante de um projeto react é o conteúdo da asta
+
+No raiz do apllicativo criado icam:
+
+/public
+/src
+index.html
+package.json
+vite.config.js
+.eslintrc.cjs
+.gitignore
+
+Depois de rodar npm install a pasta nodde_modules é criada com as deependências. Veja o arquivo Estrutura para explicação destes
+
+src/
+
+Dentro da pasta erc/ podemoos remover com segurança
+
+/assets
+App.css
+index.css
+
+Depois remoover o import './index.css' do
+
+main.jsx
+
+Então remover
+
+Os imports
+
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from '/vite.svg'
+import './App.css'
+
+Já a function App podemos enxugaar para que fique assim
+
+function App() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+        <h1>Olá React</h1>
+    </>
+  )
+}
+
+export default App
+
+Um arquivo importante é o
+
+src/main.jsx, que na versão anterior ou usando create-reect-app era index.js
+
+Basicamente seus conteúdos quando main e index são semelhantes.
+
+O importante aqui é que eles iniciam a aplicação
+
+Vejamos um main.jsx
+
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)
+
+
+Veja que importa o reacr, o react-dom e o App.jsx
+
+Também renderiza o id="root" e o <App / > da funnção principal. Podemos precisar mudar <App />
+
+

@@ -1,0 +1,787 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+        
+<style>
+a:link {
+  color: red;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: green;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: black;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+a:active {
+  color: yellow;
+  background-color: transparent;
+  text-decoration: underline;
+}
+</style>         
+	</head>
+    <body style="font-size: 15px;">
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li9kZXZlbA==.html'>Ribamar FS - Material Bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='matematica/mdc.html'><img src='matematica/index.html@i=file'/> mdc.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>694B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>PHP Math Functions (abs, pi, deg2rad, rad2deg, fmod, floor, ceil, round, is_finite, is_infinite)
+
+As you know PHP is a sever side script language and is used for creating dynamic web pages. PHP provides a number of built-in math functions which help </pre>'><a href='matematica/PHP&#32;Math&#32;Functions.txt'><img src='matematica/index.html@i=text'/> PHP Math Functions.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>14.19KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/mmc.c'><img src='matematica/index.html@i=file'/> mmc.c</a></td>
+                                                
+                                <td>File</td>
+                                <td>600B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/plotequatjs.html'><img src='matematica/index.html@i=file'/> plotequatjs.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.32KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/TabuadaMultiplicar.html'><img src='matematica/index.html@i=file'/> TabuadaMultiplicar</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.14KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Alguns comandos do MathML
+Para criar f&oacute;rmulas mater&aacute;ticas
+
+&lt;math&gt; - delimita a f&oacute;rmula
+&lt;mrow&gt; - agrupa subexpress&otilde;es na horizontal
+&lt;mi&gt; - variaveis
+&lt;mn&gt; - n&uacute;meros
+&lt;mo&gt; - para mostrar o sinal = ou +/- &lt;mo&gt;&amp;PlusMinus;&lt;/mo&gt;
+&lt;mo form=&quot;prefix&quot;&gt;&amp;minus</pre>'><a href='matematica/Alguns&#32;comandos&#32;do&#32;MathML.txt'><img src='matematica/index.html@i=text'/> Alguns comandos do MathML.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.26KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&quot;use strict&quot;;var VoiceRSS={speech:function(e){this._validate(e),this._request(e)},_validate:function(e){if(!e)throw&quot;The settings are undefined&quot;;if(!e.key)throw&quot;The API key is undefined&quot;;if(!e.src)throw&quot;The text is undefined&quot;;if(!e.hl)throw&quot;The langua</pre>'><a href='matematica/voicerss-tts.min.js'><img src='matematica/index.html@i=javascript'/> voicerss-tts.min.js</a></td>
+                                                
+                                <td>Javascript</td>
+                                <td>2.02KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/eqsegundograu.php.html'><img src='matematica/index.html@i=file'/> eqsegundograu.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>484B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/plot-js.html'><img src='matematica/index.html@i=file'/> plot-js.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.62KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/desafios.php.html'><img src='matematica/index.html@i=file'/> desafios.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.4KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/matriz.html'><img src='matematica/index.html@i=file'/> matriz.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>715B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/Referencias.md'><img src='matematica/index.html@i=file'/> Referencias.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>781B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/determinantes-de-matrizes.html'><img src='matematica/index.html@i=file'/> determinantes-de-matrizes.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.96KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/0matematica.zip'><img src='matematica/index.html@i=compressed'/> 0matematica.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>1.19MB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/eq_2grau.html'><img src='matematica/index.html@i=file'/> eq_2grau.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>905B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://addons.mozilla.org/en-US/firefox/addon/texzilla/
+</pre>'><a href='matematica/Extensao_Firefox.txt'><img src='matematica/index.html@i=text'/> Extensao_Firefox.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>57B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/equacao2grau_tts.html'><img src='matematica/index.html@i=file'/> equacao2grau_tts.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.95KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='matematica/index.html@Li9tYXRoX2pz.html'><img src='matematica/index.html@i=folder'/> math_js</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:07:14</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/determinante.html'><img src='matematica/index.html@i=file'/> determinante.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.12KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/desafios-js.html'><img src='matematica/index.html@i=file'/> desafios-js</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.86KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/canvas-plot.html'><img src='matematica/index.html@i=file'/> canvas-plot.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.79KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/math-obj.html'><img src='matematica/index.html@i=file'/> math-obj.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/index.php.html'><img src='matematica/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.71KB</td>
+                                <td>2024-05-22 07:37:04</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/eqseggrau.php.html'><img src='matematica/index.html@i=file'/> eqseggrau.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>853B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/cem.html'><img src='matematica/index.html@i=file'/> cem.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>201B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='matematica/index.html@Li9wbG90X2pz.html'><img src='matematica/index.html@i=folder'/> plot_js</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/plotjs.html'><img src='matematica/index.html@i=file'/> plotjs.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.55KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/eq2grau-simples.html'><img src='matematica/index.html@i=file'/> eq2grau-simples.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>605B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/mmc.html'><img src='matematica/index.html@i=file'/> mmc.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>767B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='matematica/index.html@Li9QbG90dHk=.html'><img src='matematica/index.html@i=folder'/> Plotty</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:07:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/equacao2grau.html'><img src='matematica/index.html@i=file'/> equacao2grau.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.36KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/MatematicaTestes.htm'><img src='matematica/index.html@i=file'/> MatematicaTestes.htm</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.83KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+```php
+function factorial($s){
+    if($s) $r = $s * factorial($s - 1);
+    else $r = 1;
+    return $r;
+}
+print factorial(5);
+
+
+&lt;?php 
+echo(round(1.95583, 2).&quot;\n&quot;); 
+echo(round(1241757, -3).&quot;\n&quot;); 
+echo(round(9.5, 0, PHP_ROUND_HALF_UP).&quot;\n&quot;); 
+echo(r</pre>'><a href='matematica/Outros.txt'><img src='matematica/index.html@i=text'/> Outros.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1022B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/cem.cpp'><img src='matematica/index.html@i=file'/> cem.cpp</a></td>
+                                                
+                                <td>File</td>
+                                <td>332B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/equacao2grau_html.html'><img src='matematica/index.html@i=file'/> equacao2grau_html.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1015B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>/**
+ * math.js
+ * https://github.com/josdejong/mathjs
+ *
+ * Math.js is an extensive math library for JavaScript and Node.js,
+ * It features real and complex numbers, units, matrices, a large set of
+ * mathematical functions, and a flexible expression</pre>'><a href='matematica/math.js'><img src='matematica/index.html@i=javascript'/> math.js</a></td>
+                                                
+                                <td>Javascript</td>
+                                <td>558.9KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>/**
+ * math.js
+ * https://github.com/josdejong/mathjs
+ *
+ * Math.js is an extensive math library for JavaScript and Node.js,
+ * It features real and complex numbers, units, matrices, a large set of
+ * mathematical functions, and a flexible expression</pre>'><a href='matematica/math.min.js'><img src='matematica/index.html@i=javascript'/> math.min.js</a></td>
+                                                
+                                <td>Javascript</td>
+                                <td>528.68KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/mmc2.c'><img src='matematica/index.html@i=file'/> mmc2.c</a></td>
+                                                
+                                <td>File</td>
+                                <td>495B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Matem&aacute;tica na programa&ccedil;&atilde;o
+
+Dicas para PHP, JavaScript, Java, etc
+
+- Equa&ccedil;&atilde;o do segundo grau
+- Plotagem
+- Gr&aacute;ficos
+- MMC
+- MDC
+- Outros
+
+</pre>'><a href='matematica/README.txt'><img src='matematica/index.html@i=text'/> README.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>144B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/quadrado.html'><img src='matematica/index.html@i=file'/> quadrado.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>732B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>// Algoritmo para ler do usu&aacute;rio o tamanho para um vetor de inteiros e preencher cada posi&ccedil;&atilde;o do vetor com o n&uacute;mero do seu &iacute;ndice multiplicado por 2. Ap&oacute;s preenchido exibir cada valor armazenado.
+
+Solu&ccedil;&atilde;o
+var vetor = [];
+var i;
+
+for(i=0;i&lt;20;</pre>'><a href='matematica/desafios.txt'><img src='matematica/index.html@i=text'/> desafios.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.86KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/Matematica.html'><img src='matematica/index.html@i=file'/> Matematica</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.5KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>var a = 1056261433; 
+var b = 431977909;
+var c = -281860834.022;
+
+function bhaskara(a, b, c) {
+  
+   var ret = [];
+   var d = delta(a, b, c);
+   ret[0] = ((b * -1) - Math.sqrt(d)) / (2 * a);
+   ret[1] = ((b * -1) + Math.sqrt(d)) / (2 * a);
+   return r</pre>'><a href='matematica/eq2grau.txt'><img src='matematica/index.html@i=text'/> eq2grau.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>436B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/math.html'><img src='matematica/index.html@i=file'/> math.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='matematica/cem.php.html'><img src='matematica/index.html@i=file'/> cem.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>177B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+0
+
+Quem est&aacute; armazenando os n&uacute;meros primos &eacute; o m&eacute;todo push()
+
+O m&eacute;todo push() adiciona um ou mais elementos ao final de um array e retorna o novo comprimento desse array.
+
+O simbolo do operador % &eacute; chamado de operador de m&oacute;dulo. O resultado d</pre>'><a href='matematica/Primos.txt'><img src='matematica/index.html@i=text'/> Primos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.72KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,590 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li8yUEhQT08=.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&lt;?php
+// NoticiaHeranca.php
+include_once(&#039;Noticia.php&#039;);
+
+class NoticiaPrincipal extends Noticia
+{
+    public $imagem;
+
+    public function setImagem($valor)
+    {
+        $this-&gt;imagem = $valor;
+    }
+
+    public function exibeNoticia()
+    {
+      </pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/NoticiaHeranca.php.txt'><img src='Tutoriais/index.html@i=text'/> NoticiaHeranca.php.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.3KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/ACTIVE%20RECORD.odt'><img src='Tutoriais/index.html@i=file'/> ACTIVE RECORD.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>319.82KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>M&eacute;todos m&aacute;gicos
+
+M&eacute;todos m&aacute;gicos s&atilde;o m&eacute;todos com funcionalidades espec&iacute;ficas e que podem ser utilizados de acordo com as nossas necessidades. Continuaremos a utilizar o nosso exemplo das classes de not&iacute;cias.
+
+Para usar esses m&eacute;todos m&aacute;gicos</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/MetodosMagicos.txt'><img src='Tutoriais/index.html@i=text'/> MetodosMagicos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>9.88KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>UML
+
+https://umbrello.kde.org/installation.php
+
+https://community.linuxmint.com/software/view/umbrello
+
+sudo snap install umbrello
+
+
+StartUML
+
+wget http://staruml.io/download/releases/StarUML-3.2.2.AppImage -O staruml.appimage
+
+chmod +x staruml.appim</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/Ferramentas.txt'><img src='Tutoriais/index.html@i=text'/> Ferramentas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>406B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&lt;?php
+/*
+Convertendo objeto em String
+Para evitar que aconte&ccedil;a um erro quando &ndash; e se &ndash; algum script tentar mostrar a classe MyClass como uma string, existe outro m&eacute;todo m&aacute;gico, chamado __toString().
+Sem o m&eacute;todo __toString(), tentar mostrar u</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/ToString.txt'><img src='Tutoriais/index.html@i=text'/> ToString.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.61KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Coment&aacute;rios com DocBlocks
+&quot;O estilo de coment&aacute;rios DocBlock &eacute; um
+meio bem aceito para documentar classes.&quot;
+Embora n&atilde;o seja uma parte oficial da POO, os coment&aacute;rios DocBlock s&atilde;o um meio bem aceito para documentar classes. Al&eacute;m de prover um padr</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/DocBlock.txt'><img src='Tutoriais/index.html@i=text'/> DocBlock.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.65KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Classes Abstratas
+
+Classes abstratas s&atilde;o classes que n&atilde;o podem ser instanciadas diretamente, sendo necess&aacute;ria a cria&ccedil;&atilde;o de uma sub-classe para conseguir utilizar suas caracter&iacute;sticas. Isso n&atilde;o quer dizer que os m&eacute;todos destas classes tamb&eacute;m </pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/Abstract.txt'><img src='Tutoriais/index.html@i=text'/> Abstract.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.95KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>O coment&aacute;rio abaixo &eacute; o que se utiliza num phpdoc.
+
+  /**
+  * adds an array of numbers and returns the value
+  *
+  * @param array $numbers An array of numbers to add
+  *
+  * @access private
+  *
+  * @return int Returns sum of numbers
+  * 
+  */
+  pri</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/comentarios.txt'><img src='Tutoriais/index.html@i=text'/> comentarios.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>368B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>this - palavra chave $this
+
+O objeto&nbsp;$this&nbsp;&eacute; uma pseudo-vari&aacute;vel que fica dispon&iacute;vel para acesso quando um m&eacute;todo &eacute; chamado dentro de um contexto de objeto. Por&eacute;m, o que isso quer dizer? 
+O&nbsp;$this&nbsp;nada mais &eacute; do que um objeto chamador, ele </pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/PalavrasChaves.txt'><img src='Tutoriais/index.html@i=text'/> PalavrasChaves.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.19KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&quot;Class &#039;aqui o nome da sua classe&#039; not found&quot; error
+
+De tanto esta mensagem aparecer eu cheguei a pensar em abandonar o uso de namespace e voltar para os requires. Mas eu resolvi fazer uma boa pesquisa e anotar algumas observa&ccedil;&otilde;es que eu sabia que </pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/ClassNotFound.txt'><img src='Tutoriais/index.html@i=text'/> ClassNotFound.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.32KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+
+https://www.tutorialspoint.com/php/php_object_oriented.htm
+
+https://phpenthusiast.com/object-oriented-php-tutorials/create-classes-and-objects
+
+
+</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/Referencias.txt'><img src='Tutoriais/index.html@i=text'/> Referencias.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>147B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9DbGFzc2VPYmpldG9zMy5wbmc="/>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/ClasseObjetos3.png'><img src='Tutoriais/index.html@i=image'/> ClasseObjetos3.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>368.02KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&lt;?php
+    // noticia.class.php
+class Noticia
+{
+    public $titulo;
+    public $texto;
+
+    public function setTitulo($valor)
+    {
+        $this-&gt;titulo = $valor;
+    }
+
+    public function setTexto($valor)
+    {
+        $this-&gt;texto = $valor;
+    }
+</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/Noticia.php.txt'><img src='Tutoriais/index.html@i=text'/> Noticia.php.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>966B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Orienta&ccedil;&atilde;o a Objetos
+
+Na orienta&ccedil;&atilde;o a objetos temos conceitos essenciais como Classe, Objetos/Inst&acirc;ncias, Atributos, M&eacute;todos, Heran&ccedil;a, Encapsulamento, Associa&ccedil;&atilde;o, Composi&ccedil;&atilde;o, Agrega&ccedil;&atilde;o, Abstra&ccedil;&atilde;o, Polimorfismo e Interface. Esses s&atilde;o a</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/OrientacaoObjetos.txt'><img src='Tutoriais/index.html@i=text'/> OrientacaoObjetos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>8.91KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/index.php'><img src='Tutoriais/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Comparando C&oacute;digo Orientado a Objetos e C&oacute;digo Procedural
+N&atilde;o h&aacute; maneira certo ou errada de programar. Isso dito, essa se&ccedil;&atilde;o mostrar bons argumentos para adotar a abordagem orientada a objetos no desenvolvimento de software, especialmente em ap</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/POOxProcedural.txt'><img src='Tutoriais/index.html@i=text'/> POOxProcedural.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>7.95KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Usando Traits em PHP
+
+O PHP s&oacute; permite heran&ccedil;a &uacute;nica. Em outras palavras, uma classe pode estender apenas uma outra classe. Mas e se voc&ecirc; precisar inclui algo que n&atilde;o pertence &agrave; classe pai? Antes do PHP 5.4, voc&ecirc; teria que ser criativo, mas em</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/TraitsPHP.txt'><img src='Tutoriais/index.html@i=text'/> TraitsPHP.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.28KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Usando Traits em PHP
+
+O PHP s&oacute; permite heran&ccedil;a &uacute;nica. Em outras palavras, uma classe pode estender apenas uma outra classe. Mas e se voc&ecirc; precisar inclui algo que n&atilde;o pertence &agrave; classe pai? Antes do PHP 5.4, voc&ecirc; teria que ser criativo, mas em</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/Traits.txt'><img src='Tutoriais/index.html@i=text'/> Traits.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.28KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>M&eacute;todos encadeados
+
+Utilizar m&eacute;todos encadeados &eacute; uma maneira de se trabalhar de forma mais limpa e din&acirc;mica, chamando um m&eacute;todo ap&oacute;s o outro sem a necessidade de chamar o objeto de inst&acirc;ncia da classe.
+
+Entendendo um pouco como funciona o m&eacute;</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/MetodosEncadeados.txt'><img src='Tutoriais/index.html@i=text'/> MetodosEncadeados.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.02KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/DBManager.php'><img src='Tutoriais/index.html@i=file'/> DBManager.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.95KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Encapsulamento
+
+Este recurso possibilita ao programador restringir ou liberar o acesso &agrave;s propriedades e m&eacute;todos das classes. A utiliza&ccedil;&atilde;o deste recurso s&oacute; se tornou poss&iacute;vel &agrave; partir do PHP 5. Aplica-se este conceito atrav&eacute;s dos operadores: </pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/Encapsulamento.txt'><img src='Tutoriais/index.html@i=text'/> Encapsulamento.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.3KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9DbGFzc2VPYmpldG9zMi5wbmc="/>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/ClasseObjetos2.png'><img src='Tutoriais/index.html@i=image'/> ClasseObjetos2.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>31.99KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbGFzcy1vYmpldG9zLnBuZw=="/>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/class-objetos.png'><img src='Tutoriais/index.html@i=image'/> class-objetos.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>149.06KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Context-Sensitive lexer
+
+Permite o uso de palavras-chave como nome de propriedades, m&eacute;todos e constantes dentro de classes, interfaces e traits.
+
+Isso quer dizer que o PHP vai ter apenas uma palavra-chave reservada, &lsquo;class&rsquo;, e somente no context</pre>'><a href='http://backup/material/devel/backend/PHP/2PHPOO/Tutoriais/PHP7.txt'><img src='Tutoriais/index.html@i=text'/> PHP7.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.12KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

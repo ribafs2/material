@@ -1,0 +1,3 @@
+Uma promise é uma construção do JavaScript que representa um valor futuro desconhecido (apenas a "promessa" de um valor). Por conceito, uma promise é apenas o JavaScript "prometendo" retornar um valor.
+
+

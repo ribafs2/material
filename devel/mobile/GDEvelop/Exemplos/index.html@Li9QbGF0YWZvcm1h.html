@@ -1,0 +1,708 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/?Lg=='>Index of /material/devel/mobile/GDEvelop/Exemplos/Plataforma/</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/platformer.json.autosave'><img src='index.html@i=file'/> platformer.json.autosave</a></td>
+                                                
+                                <td>File</td>
+                                <td>64.8KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/coin.wav'><img src='index.html@i=audio'/> coin.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>21.82KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3AxX3dhbGswNS5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/p1_walk05.png'><img src='index.html@i=image'/> p1_walk05.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.85KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3RpbGVkX0ZvcmVzdCBCYWNrZ3JvdW5kLnBuZw=="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/tiled_Forest%20Background.png'><img src='index.html@i=image'/> tiled_Forest Background.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>21.45KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2NhY3R1cy5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/cactus.png'><img src='index.html@i=image'/> cactus.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.56KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL1BsYXllckFyZWEucG5n"/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/PlayerArea.png'><img src='index.html@i=image'/> PlayerArea.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>297B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2xhZGRlcl9taWQucG5n"/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/ladder_mid.png'><img src='index.html@i=image'/> ladder_mid.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>469B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2JyaWRnZS5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/bridge.png'><img src='index.html@i=image'/> bridge.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.17KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2ZseURlYWQucG5n"/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/flyDead.png'><img src='index.html@i=image'/> flyDead.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.08KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2dyYXNzSGFsZk1pZC5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/grassHalfMid.png'><img src='index.html@i=image'/> grassHalfMid.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.72KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2Nhc3RsZUNlbnRlci5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/castleCenter.png'><img src='index.html@i=image'/> castleCenter.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>465B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3NsaW1lV2FsazEucG5n"/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/slimeWalk1.png'><img src='index.html@i=image'/> slimeWalk1.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.42KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2JyaWRnZUxvZ3MucG5n"/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/bridgeLogs.png'><img src='index.html@i=image'/> bridgeLogs.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.57KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3NoYWRlZERhcms0NS5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/shadedDark45.png'><img src='index.html@i=image'/> shadedDark45.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.84KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/platformer.json'><img src='index.html@i=file'/> platformer.json</a></td>
+                                                
+                                <td>File</td>
+                                <td>163.92KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3NsaW1lRGVhZC5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/slimeDead.png'><img src='index.html@i=image'/> slimeDead.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>568B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/jump.wav'><img src='index.html@i=audio'/> jump.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>29.55KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2NvaW5Hb2xkLnBuZw=="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/coinGold.png'><img src='index.html@i=image'/> coinGold.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1013B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2Nsb3VkMS5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/cloud1.png'><img src='index.html@i=image'/> cloud1.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.29KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/Bimbo_JVE.ttf'><img src='index.html@i=file'/> Bimbo_JVE.ttf</a></td>
+                                                
+                                <td>File</td>
+                                <td>18.26KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3AxX3dhbGswNi5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/p1_walk06.png'><img src='index.html@i=image'/> p1_walk06.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.82KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3NoYWRlZERhcmswOS5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/shadedDark09.png'><img src='index.html@i=image'/> shadedDark09.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.44KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/README.md'><img src='index.html@i=file'/> README.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>70B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3AxX2p1bXAucG5n"/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/p1_jump.png'><img src='index.html@i=image'/> p1_jump.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.77KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3AxX3N0YW5kLnBuZw=="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/p1_stand.png'><img src='index.html@i=image'/> p1_stand.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.73KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2JyaWNrV2FsbC5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/brickWall.png'><img src='index.html@i=image'/> brickWall.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.04KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL0xlZnQucG5n"/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/Left.png'><img src='index.html@i=image'/> Left.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.24KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2Nsb3VkMy5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/cloud3.png'><img src='index.html@i=image'/> cloud3.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.27KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3NoYWRlZERhcmswNS5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/shadedDark05.png'><img src='index.html@i=image'/> shadedDark05.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>868B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL1JpZ2h0LnBuZw=="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/Right.png'><img src='index.html@i=image'/> Right.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.24KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2ZseUZseTEucG5n"/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/flyFly1.png'><img src='index.html@i=image'/> flyFly1.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.24KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2Nsb3VkMi5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/cloud2.png'><img src='index.html@i=image'/> cloud2.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.27KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3AxX3dhbGswOC5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/p1_walk08.png'><img src='index.html@i=image'/> p1_walk08.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.51KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2J1c2gucG5n"/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/bush.png'><img src='index.html@i=image'/> bush.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.54KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL0QtcGFkIGJvdHRvbS5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/D-pad%20bottom.png'><img src='index.html@i=image'/> D-pad bottom.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>748B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3BsYW50LnBuZw=="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/plant.png'><img src='index.html@i=image'/> plant.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.68KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/life%20lost%20sound.wav'><img src='index.html@i=audio'/> life lost sound.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>338.09KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL0dyYXNzLnBuZw=="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/Grass.png'><img src='index.html@i=image'/> Grass.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.42KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3AxX3dhbGswMS5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/p1_walk01.png'><img src='index.html@i=image'/> p1_walk01.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.55KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL0QtcGFkIHRvcC5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/D-pad%20top.png'><img src='index.html@i=image'/> D-pad top.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>771B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3NsaW1lV2FsazIucG5n"/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/slimeWalk2.png'><img src='index.html@i=image'/> slimeWalk2.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.45KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3AxX3dhbGswMi5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/p1_walk02.png'><img src='index.html@i=image'/> p1_walk02.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.62KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL05ld0ZpbGUtMS5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/NewFile-1.png'><img src='index.html@i=image'/> NewFile-1.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>186B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3AxX3dhbGswNy5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/p1_walk07.png'><img src='index.html@i=image'/> p1_walk07.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.72KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3AxX3dhbGswMy5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/p1_walk03.png'><img src='index.html@i=image'/> p1_walk03.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.98KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3NoYWRlZERhcmswNi5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/shadedDark06.png'><img src='index.html@i=image'/> shadedDark06.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>829B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL2ZseUZseTIucG5n"/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/flyFly2.png'><img src='index.html@i=image'/> flyFly2.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.06KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9QbGF0YWZvcm1hL3AxX3dhbGswNC5wbmc="/>'><a href='http://backup/material/devel/mobile/GDEvelop/Exemplos/Plataforma/p1_walk04.png'><img src='index.html@i=image'/> p1_walk04.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.99KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>
