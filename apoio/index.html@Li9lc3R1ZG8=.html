@@ -1,0 +1,960 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+        
+<style>
+a:link {
+  color: red;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: green;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: black;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+a:active {
+  color: yellow;
+  background-color: transparent;
+  text-decoration: underline;
+}
+</style>         
+	</head>
+    <body style="font-size: 15px;">
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li9hcG9pbw==.html'>Ribamar FS - Material Bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr class='success'>
+                                                        
+                                <td><a href='estudo/index.html@Li9Gcm9udC1lbmQ=.html'><img src='estudo/index.html@i=folder'/> Front-end</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 08:16:36</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9hbGdvcml0bW8ucG5n"/>'><a href='estudo/algoritmo.png'><img src='estudo/index.html@i=image'/> algoritmo.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>12.25KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>COMO SER AUTODIDATA EM 5 DICAS - Estudar Sozinho em Casa
+https://www.youtube.com/watch?v=j6DkXhg6KWc
+
+</pre>'><a href='estudo/AutoDidata.txt'><img src='estudo/index.html@i=text'/> AutoDidata.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>102B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Clube dos Programadores
+Gustaf S&eacute;timo  &middot; rspoSn11ff11ui h977c830526ll  &middot;
+Virar um programador &eacute; f&aacute;cil, voc&ecirc;s s&oacute; precisam...
+1 - Aprender HTML e CSS
+N&atilde;o pense que &eacute; f&aacute;cil o CSS vai acabar com voc&ecirc;.
+2 - Aprender ou saber o b&aacute;sico de JavaScr</pre>'><a href='estudo/Aprender.txt'><img src='estudo/index.html@i=text'/> Aprender.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.05KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='estudo/index.html@Li9DdXJzb3M=.html'><img src='estudo/index.html@i=folder'/> Cursos</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 08:15:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>HTML, CSS, L&oacute;gica da Programa&ccedil;&atilde;o, JavaScript, Banco de Dados, Projetos de Sistemas Web.
+Carga hor&aacute;ria: 200 horas
+https://moodle.ifrs.edu.br/login/index.php
+
+
+</pre>'><a href='estudo/CursosGratuitos.txt'><img src='estudo/index.html@i=text'/> CursosGratuitos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>162B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9DYW5haXMuanBn"/>'><a href='estudo/Canais.jpg'><img src='estudo/index.html@i=image'/> Canais.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>114.49KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estudo/estudando-com-a-maxima-eficiencia.html@tmpl=component&amp;print=1&amp;layout=default.html'><img src='estudo/index.html@i=file'/> estudando-com-a-maxima-eficiencia.html@tmpl=component&print=1&layout=default.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>45.87KB</td>
+                                <td>2020-12-28 07:50:00</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Rant: Aprendizado na Beira do Caos | Rated R
+https://www.youtube.com/watch?v=am-FQ86mKV0
+
+
+</pre>'><a href='estudo/Sucesso.txt'><img src='estudo/index.html@i=text'/> Sucesso.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>91B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Daniel Kelly atualizou a foto do perfil.
+2 h  &middot;
+Aula#22    Tabelas em HTML
+A Tabela em HTML representa os dados em uma forma tabular.  &Eacute; composto por colunas e linhas de c&eacute;lulas que cont&ecirc;m dados.
+O elemento &lt;table&gt; define uma tabela HTML.
+Element</pre>'><a href='estudo/TabelaHTML.txt'><img src='estudo/index.html@i=text'/> TabelaHTML.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.94KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>5 Must-Have Skills For Backend Developers 2021
+
+    Technical Skills
+    Detailed Oriented
+    Communication Skills
+    Research Skills
+    Team Player
+    
+https://masteringbackend.com/posts/5-must-have-skills-for-a-backend-developer
+    
+</pre>'><a href='estudo/Skils.txt'><img src='estudo/index.html@i=text'/> Skils.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>240B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Tentando ajudar
+Exemplos grosseiros:
+Algo assim: se est&aacute; claro ent&atilde;o &eacute; de dia.
+Se est&aacute; escuro ent&atilde;o &eacute; de noite.
+Se tem sangue ent&atilde;o est&aacute; vivo.
+Se n&atilde;o tem sangue est&aacute; morto.
+Isso &eacute; um racioc&iacute;nio de se ... ent&atilde;o ...
+Algo como um trabalho d</pre>'><a href='estudo/Logica.txt'><img src='estudo/index.html@i=text'/> Logica.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.52KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Quer programar usando o celular?
+Ent&atilde;o use os seguintes aplicativos: 
+1&ordm;- Pydroid 3 pra Python
+2&ordm;- CppDroid pra linguagem C e C++
+Pra Web use essas aplica&ccedil;&otilde;es:
+1&ordm;-Acode pra PHP, JavaScript e outros
+2&ordm;- Quoda
+3&deg;- Aweb server pra BASE DE DADOS
+</pre>'><a href='estudo/EstudarCelular.txt'><img src='estudo/index.html@i=text'/> EstudarCelular.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>250B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://www.youtube.com/watch?v=Ll1uAZ-WRa0
+</pre>'><a href='estudo/OQueEstudar.txt'><img src='estudo/index.html@i=text'/> OQueEstudar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>44B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Clube dos Programadores
+Vinicius Rafael Machado  &middot; denotposrSc4c51403ff8649hui 24lh8h6hci1a11  &middot;
+[Desabafo sobre iniciantes + dicas]
+Vejo nesse grupo e em outros, a galera DESESPERADA querendo entrar na trybe pra ontem, querendo ganhar 2k e meio se</pre>'><a href='estudo/AprenderDeGraca.txt'><img src='estudo/index.html@i=text'/> AprenderDeGraca.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.83KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li93ZWItbGFuZ3MuanBn"/>'><a href='estudo/web-langs.jpg'><img src='estudo/index.html@i=image'/> web-langs.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>43.68KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9uaXZlaXMtY2FycmVpcmEuanBn"/>'><a href='estudo/niveis-carreira.jpg'><img src='estudo/index.html@i=image'/> niveis-carreira.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>56.02KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Matondo Jo&atilde;o
+  &middot;
+O Framework PHP Laravel &ndash; Constru&ccedil;&atilde;o de Aplicativos Web Para Todos
+O desenvolvimento de aplicativos web e websites tem se tornado cada vez mais simples nos &uacute;ltimos anos. Mesmo os mais desafiados tecnologicamente entre n&oacute;s se </pre>'><a href='estudo/Laravel.txt'><img src='estudo/index.html@i=text'/> Laravel.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.1KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estudo/estudando-com-a-maxima-eficiencia.html'><img src='estudo/index.html@i=file'/> estudando-com-a-maxima-eficiencia.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>90.01KB</td>
+                                <td>2020-12-28 07:50:00</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Matondo Jo&atilde;o
+  &middot;
+Saiba o que &eacute; Node.js, como ele funciona e como us&aacute;-lo no seu site
+O #Node.js &eacute; ideal para aplica&ccedil;&otilde;es multidirecionais que ocorrem em tempo real, como chats. Al&eacute;m disso, pode ser usado na transmiss&atilde;o e visualiza&ccedil;&atilde;o de dado</pre>'><a href='estudo/nodejs.txt'><img src='estudo/index.html@i=text'/> nodejs.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.17KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://www.youtube.com/watch?v=BTENKdRVS2U
+
+</pre>'><a href='estudo/AntesDeComecar.txt'><img src='estudo/index.html@i=text'/> AntesDeComecar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>45B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Aviato Creavite atualizou a foto do perfil.
+10 h  &middot;
+Dicas para programadores iniciantes👨🏻&zwj;💻🤓
+Atualmente, existem muitas pessoas que querem ingressar na &aacute;rea de tecnologia, principalmente nesse mundo da programa&ccedil;&atilde;o. Programa&ccedil;&atilde;o, co</pre>'><a href='estudo/ComoEstudar.txt'><img src='estudo/index.html@i=text'/> ComoEstudar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.82KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Node.js - Brazil
+Leonardo Santos  &middot; 22 de abril &agrave;s 09:15  &middot;
+A pouco respondi uma d&uacute;vida sobre assincronismo aqui na p&aacute;gina.
+A final, javascript &eacute; ou n&atilde;o Single Thread?
+
+Essa era um tipo de d&uacute;vida que eu tinha quando comecei a estudar javascri</pre>'><a href='estudo/NodeThreads.txt'><img src='estudo/index.html@i=text'/> NodeThreads.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.97KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Dicion&aacute;rio do programador (completo)
+
+Colabora&ccedil;&atilde;o do Matondo Jo&atilde;o num grupo do Facebook
+
+Neste artigo mostraremos o dicion&aacute;rio do programador-desenvolvedor de forma completa para voc&ecirc; entender os principais termos t&eacute;cnicos de tecnologias que</pre>'><a href='estudo/DicionarioInfo.txt'><img src='estudo/index.html@i=text'/> DicionarioInfo.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>19.61KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>001 programa&ccedil;&atilde;o de computadores parte 1 - 4 aulas com o Jo&atilde;o Ribeiro
+https://www.youtube.com/playlist?list=PLXik_5Br-zO8n54GSDrEQFVpvshtx0VKh
+
+B&aacute;sico em programa&ccedil;&atilde;o - L&oacute;gica
+https://www.youtube.com/playlist?list=PLA68q_6H3nhh8DT1oq8AjSJWKWHVBE</pre>'><a href='estudo/Referencias.txt'><img src='estudo/index.html@i=text'/> Referencias.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>722B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Material sobre estudo
+
+Boa quantidade de material sobre estudo, especialmente estudo de programa&ccedil;&atilde;o. 
+
+## Veja tamb&eacute;m material sobre trabalho
+
+https://github.com/ribafs/trabalho
+
+Mas muita coisa aqui &eacute; material bruto, sem qualquer formata&ccedil;&atilde;o.</pre>'><a href='estudo/LEIAME.txt'><img src='estudo/index.html@i=text'/> LEIAME.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>966B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9uaXZlaXMuanBn"/>'><a href='estudo/niveis.jpg'><img src='estudo/index.html@i=image'/> niveis.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>51.58KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Gustavo Ara&uacute;jo
+Administrador do grupo Clube dos Programadores no Facebook
+
+  &middot; 14 de fevereiro &agrave;s 12:20  &middot;
+[PERGUNTAS FREQUENTES &mdash; D&Uacute;VIDAS COMUNS]
+
+Para evitar o flood no grupo com postagens repetidas, resolvi criar esse post respondendo &agrave;s p</pre>'><a href='estudo/ComoOqueEstudar.txt'><img src='estudo/index.html@i=text'/> ComoOqueEstudar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>7.84KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9hYnN0cmFjYW9lbmNhcHN1bGFtZW50by5qcGc="/>'><a href='estudo/abstracaoencapsulamento.jpg'><img src='estudo/index.html@i=image'/> abstracaoencapsulamento.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>108.29KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Uma classe &eacute; como uma planta de casa, em que o engenheiro usa para construir casas. As casas constru&iacute;das s&atilde;o como objetos que foram criados partindo da planta. Uma classe d&aacute; origem a objetos. Na pr&aacute;tica n&atilde;o se usa plantas, mas sim casas. Tamb&eacute;</pre>'><a href='estudo/OrientacaoObjetos.txt'><img src='estudo/index.html@i=text'/> OrientacaoObjetos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.08KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&Eacute; algo parecido com o trabalho de um detetive, que sai rastreando pistas para desvendar casos. Com o passar do tempo e com a experi&ecirc;ncia, ele j&aacute; faz seu trabalho mais rapidamente, pois sabe que certas pistas s&atilde;o falsas e que outras s&atilde;o verdadeir</pre>'><a href='estudo/RaciocinioLogico.txt'><img src='estudo/index.html@i=text'/> RaciocinioLogico.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>369B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Tem hora que acho que devo aprnder tudo que existe, mas precisamos parar e perceber o que queremos fazer pra valer. Ent&atilde;o d&aacute; uma olhada em geral e experimenta algumas das linguagens e ent&atilde;o escolhe a que deseja usar. Com o tempo pode at&eacute; trocar o</pre>'><a href='estudo/Estudar.txt'><img src='estudo/index.html@i=text'/> Estudar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>581B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9saW5ndWFnZW5zLmpwZw=="/>'><a href='estudo/linguagens.jpg'><img src='estudo/index.html@i=image'/> linguagens.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>55.16KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>PHP Brasil
+Luciano Melo  &middot; 11 min  &middot;
+Pessoal, apenas um ponto de reflex&atilde;o sobre a vis&atilde;o de algumas pessoas da &aacute;rea:
+&quot;As universidades est&atilde;o atrasadas em rela&ccedil;&atilde;o ao mercado&quot;
+1&deg; Universidade n&atilde;o formam programadores, e sim gestores, ci&ecirc;ntist</pre>'><a href='estudo/Faculdade.txt'><img src='estudo/index.html@i=text'/> Faculdade.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>896B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Matem&aacute;tica na Programa&ccedil;&atilde;o
+
+&Eacute; importante que o programador tenha um conhecimento b&aacute;sico de todas as &aacute;reas de conhecimento, aquelas fornecidas pelo ensino m&eacute;dio. Isso porque o programador pode ser convidado por um engenheiro, um m&eacute;dico, um advo</pre>'><a href='estudo/MatematicaProg.txt'><img src='estudo/index.html@i=text'/> MatematicaProg.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.7KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9odHRwLWNvZGVzLmpwZw=="/>'><a href='estudo/http-codes.jpg'><img src='estudo/index.html@i=image'/> http-codes.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>682.17KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estudo/index.php.html'><img src='estudo/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.71KB</td>
+                                <td>2024-05-22 07:37:04</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://www.youtube.com/watch?v=eKIKFZW6XB8
+
+</pre>'><a href='estudo/Junior.txt'><img src='estudo/index.html@i=text'/> Junior.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>47B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estudo/front-back.html'><img src='estudo/index.html@i=file'/> front-back</a></td>
+                                                
+                                <td>File</td>
+                                <td>519B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Matondo Jo&atilde;o compartilhou uma foto.
+Administrador
+  &middot; 1 h  &middot;
+Ol&aacute;🙋🏻&zwj;♂️, Developers👨🏻&zwj;💻
+Neste artigo vamos mostrar como se tornar um #desenvolvedor web profissional👨🏻&zwj;💻🤓. Voc&ecirc; vai aprender sobre o que esse trab</pre>'><a href='estudo/WebDevel.txt'><img src='estudo/index.html@i=text'/> WebDevel.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.92KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estudo/MatemÃÂÃÂ¡tica&#32;para&#32;programaÃÂÃÂ§ÃÂÃÂ£o.odt'><img src='estudo/index.html@i=file'/> MatemÃÂÃÂ¡tica para programaÃÂÃÂ§ÃÂÃÂ£o.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>40.22KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Daniel Kelly
+22 de janeiro  &middot;
+👨🏽&zwj;💻Tipos de Desenvolvedores👩🏻&zwj;💻
+At&eacute; agora existem 5 tipos de Desenvolvedores que s&atilde;o:
+💻Desenvolvedores Desktop: s&atilde;o os respons&aacute;veis pela cria&ccedil;&atilde;o de aplica&ccedil;&otilde;es que s&atilde;o executadas em um </pre>'><a href='estudo/ProgramadoresTipos.txt'><img src='estudo/index.html@i=text'/> ProgramadoresTipos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.4KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estudo/Quanto&#32;cobrar.odt'><img src='estudo/index.html@i=file'/> Quanto cobrar.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>152.01KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Ao meu ver voc&ecirc; deve se preocupar mais em aprender, aprender pra valer, fazer as coisas na pr&aacute;tiuca, muito mais que ter certificado. Certificado ajuda, mas entre os dois, certificado e saber resolver problemas, o &uacute;ltimo &eacute; o mais importante. Uma e</pre>'><a href='estudo/Certificado.txt'><img src='estudo/index.html@i=text'/> Certificado.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>627B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Hist&oacute;ria da programa&ccedil;&atilde;o
+
+2004
+
+01/04 - Lan&ccedil;amento do Gmail
+Demonstrando SPA e AJAX
+
+24/07 - 1o. Beta p&uacute;blico do ROR Beta 5
+
+05/10 - OReily promove confer&ecirc;ncia da web 2.0, onde o termo foi cunhado pela primeira vez
+
+10/12 - Google lan&ccedil;a Google </pre>'><a href='estudo/Historia.txt'><img src='estudo/index.html@i=text'/> Historia.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.05KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9hbGdvcml0bW8uanBn"/>'><a href='estudo/algoritmo.jpg'><img src='estudo/index.html@i=image'/> algoritmo.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>79.15KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estudo/1Distracoes.html'><img src='estudo/index.html@i=file'/> 1Distracoes</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.75KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estudo/estimulando-para-estudar.html@tmpl=component&amp;print=1&amp;layout=default.html'><img src='estudo/index.html@i=file'/> estimulando-para-estudar.html@tmpl=component&print=1&layout=default.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>14.78KB</td>
+                                <td>2020-12-28 07:50:00</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estudo/estimulando-para-estudar.html'><img src='estudo/index.html@i=file'/> estimulando-para-estudar.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>58.93KB</td>
+                                <td>2020-12-28 07:50:00</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zdWdlc3RvZXMtZXN0dWRhci5qcGc="/>'><a href='estudo/sugestoes-estudar.jpg'><img src='estudo/index.html@i=image'/> sugestoes-estudar.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>106.72KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Matondo Jo&atilde;o
+  &middot;
+NPM (Node Package Manager) saiba oque &eacute;? 
+O NPM &eacute; um poderoso gerenciador de pacotes utilizado para administrar as bibliotecas e frameworks utilizados em uma aplica&ccedil;&atilde;o🎲. 
+Confira as suas caracter&iacute;sticas e saiba por que deve</pre>'><a href='estudo/npm.txt'><img src='estudo/index.html@i=text'/> npm.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.64KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Aviato Creavite atualizou a foto do perfil.
+23 h  &middot;
+Porque devo Aprender🤓 PHP🐘 em 2022?
+Eu recomendaria sinceramente aprender PHP🐘 em 2022. O PHP &eacute; amplamente usado, &eacute; muito procurado, oferece muitas oportunidades e a remunera&ccedil;&atilde;o &eacute; boa</pre>'><a href='estudo/PHPporqueUsar.txt'><img src='estudo/index.html@i=text'/> PHPporqueUsar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.36KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Julio Cesar
+Bootcamp geralmente vai ser um desenvolvimento de um projeto um pouco mais elaborado mas o ensinamento tende a ser mais acelerado, voltado a pessoas que j&aacute; conhecem as bases. Pode n&atilde;o ser t&atilde;o atrativo pra quem n&atilde;o conhece bem o b&aacute;sic</pre>'><a href='estudo/Bootcamp.txt'><img src='estudo/index.html@i=text'/> Bootcamp.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.14KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estudo/programador-soft&#32;skills.odt'><img src='estudo/index.html@i=file'/> programador-soft skills.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>550.35KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Aviato Creavite
+Ontem &agrave;s 06:47  &middot;
+5 bons motivos para estudar JavaScript🤓
+O JavaScript &eacute; uma linguagem que est&aacute; praticamente em todos os lugares por causa de sua flexibilidade e adaptabilidade &agrave; diversos ambientes🚩. Vamos conferir nesse ar</pre>'><a href='estudo/PorqueEstudarJS.txt'><img src='estudo/index.html@i=text'/> PorqueEstudarJS.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>5.97KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li93ZWItZGV2ZWxvcGVyLXNraWxscy5qcGc="/>'><a href='estudo/web-developer-skills.jpg'><img src='estudo/index.html@i=image'/> web-developer-skills.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>32KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Para saber que linguagem aprender, precisa se perguntar o que deseja com programa&ccedil;&atilde;o, pois existem v&aacute;rias sub &aacute;reas: desktop, web, mobile, etc. E cada sub &aacute;rea tem v&aacute;rias linguagens. Fa&ccedil;a uma boa pesquisa sobre o assunto, experimente algumas l</pre>'><a href='estudo/QualLinguagem.txt'><img src='estudo/index.html@i=text'/> QualLinguagem.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.94KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Weslley Vieira
+Vou explicar de uma maneira bem &#039;porca&#039;.
+Frontend &eacute; oque voc&ecirc; em um site. Como:
+Anima&ccedil;&otilde;es;
+Interatividade com o cliente;
+Partes est&eacute;ticas.
+Suas principais ferramentas s&atilde;o:
+HTML (Estrutura do site),
+CSS (Estiliza&ccedil;&atilde;o),
+J</pre>'><a href='estudo/FrontBackFull.txt'><img src='estudo/index.html@i=text'/> FrontBackFull.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>589B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

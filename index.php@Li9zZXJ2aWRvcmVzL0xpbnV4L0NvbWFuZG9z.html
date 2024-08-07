@@ -1,0 +1,1157 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+        
+<style>
+a:link {
+  color: red;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: green;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: black;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+a:active {
+  color: yellow;
+  background-color: transparent;
+  text-decoration: underline;
+}
+</style>         
+	</head>
+    <body style="font-size: 15px;">
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='index.php@Li9zZXJ2aWRvcmVzL0xpbnV4.html'>Index of /material/index.phpservidores/Linux/Comandos/</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/testes_stress.html'><img src='index.php@i=file'/> testes_stress</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.37KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/admin_web.html'><img src='index.php@i=file'/> admin_web</a></td>
+                                                
+                                <td>File</td>
+                                <td>933B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/remover_servico.html'><img src='index.php@i=file'/> remover_servico</a></td>
+                                                
+                                <td>File</td>
+                                <td>174B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Permiss&otilde;es no diret&oacute;rio web
+
+A ideia &eacute; ter um grupo de desenvolvedores trabalhando num servidor web e todos com permiss&atilde;o total sobre o /var/www/html
+
+No Linux por padr&atilde;o, quando algu&eacute;m cria um arquivo ele &eacute; dono do mesmo e ningu&eacute;m mais mexe,</pre>'><a href='servidores/Linux/Comandos/permissoes_web.txt'><img src='index.php@i=text'/> permissoes_web.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.45KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/tldr.html'><img src='index.php@i=file'/> tldr</a></td>
+                                                
+                                <td>File</td>
+                                <td>66B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/Crontab.html'><img src='index.php@i=file'/> Crontab</a></td>
+                                                
+                                <td>File</td>
+                                <td>20.08KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/CrontabExemplos.html'><img src='index.php@i=file'/> CrontabExemplos</a></td>
+                                                
+                                <td>File</td>
+                                <td>940B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/Grep.html'><img src='index.php@i=file'/> Grep</a></td>
+                                                
+                                <td>File</td>
+                                <td>13.29KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Para limpar o cache da RAM
+
+sudo sysctl -w vm.drop_caches=3
+
+
+Criar um script
+
+sudo nano /usr/local/bin/m
+
+sudo sysctl -w vm.drop_caches=3
+
+sudo chmod +x /usr/local/bin/m
+
+Rodar:
+
+sudo m
+
+
+</pre>'><a href='servidores/Linux/Comandos/RAM_limparcache.txt'><img src='index.php@i=text'/> RAM_limparcache.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>189B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>ln -s origem destino
+
+Criar um link simb&oacute;lico da pasta /var/www/html/laravel/publi em /var/www/html
+
+ln -s /var/www/html/laravel/public /var/www/html
+
+</pre>'><a href='servidores/Linux/Comandos/link_simbolico2.txt'><img src='index.php@i=text'/> link_simbolico2.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>152B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/gparted.html'><img src='index.php@i=file'/> gparted</a></td>
+                                                
+                                <td>File</td>
+                                <td>0B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Parti&ccedil;&otilde;es de casa
+
+GPT
+
+1 - biosgrub 1.2G
+2 - EFI (REMOVI)
+3 - / - 59G
+4 - swap - 4G
+5 - /home - 136G
+6 - /extra - 30G
+7 - /backup - 770G
+
+Trabalho
+
+GPT
+
+1 - 100MB - BootWin - NTFS
+2 - 9,66GB - Fat16
+3 - 88GB - Win7
+4 - biosgrug - 6M
+5 - /home - 10</pre>'><a href='servidores/Linux/Comandos/particoes.txt'><img src='index.php@i=text'/> particoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>319B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/Instalar&#32;wine.html'><img src='index.php@i=file'/> Instalar wine</a></td>
+                                                
+                                <td>File</td>
+                                <td>96B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/ubuntu_upgrade.html'><img src='index.php@i=file'/> ubuntu_upgrade</a></td>
+                                                
+                                <td>File</td>
+                                <td>19B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/UbuntuAtualizar.html'><img src='index.php@i=file'/> UbuntuAtualizar</a></td>
+                                                
+                                <td>File</td>
+                                <td>164B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Listar maiores arquivos de diret&oacute;rio
+
+du --human-readable * | sort --human-numeric-sort
+
+
+du -h | egrep -v &quot;\./.+/&quot; | sort -h
+</pre>'><a href='servidores/Linux/Comandos/maiores_diretorios2.txt'><img src='index.php@i=text'/> maiores_diretorios2.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>127B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/1programas.html'><img src='index.php@i=file'/> 1programas</a></td>
+                                                
+                                <td>File</td>
+                                <td>606B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Compactar e Descompactar Arquivos no Terminal do Linux
+
+Instalar compactadores para Linux:
+sudo apt-get install unace zip unzip p7zip-full p7zip-rar sharutils uudeview mpack arj unrar rar lzma lha lzma-dev rar unrar-free ark ncompress
+
+
+zip
+Compacta</pre>'><a href='servidores/Linux/Comandos/CompactarDescompactar.txt'><img src='index.php@i=text'/> CompactarDescompactar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.5KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='index.php@Li9zZXJ2aWRvcmVzL0xpbnV4L0NvbWFuZG9zL0RpdmVyc29z.html'><img src='index.php@i=folder'/> Diversos</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:10:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/fdisk.html'><img src='index.php@i=file'/> fdisk</a></td>
+                                                
+                                <td>File</td>
+                                <td>0B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/ProcSobrescr.html'><img src='index.php@i=file'/> ProcSobrescr</a></td>
+                                                
+                                <td>File</td>
+                                <td>143B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/apt.html'><img src='index.php@i=file'/> apt</a></td>
+                                                
+                                <td>File</td>
+                                <td>114B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Comandos Linux - Lista R&aacute;pida de Comandos para Linux/UNIX
+
+Bem vindo(a) aos Comandos Linux!
+Comandos Linux &eacute; um pequeno website com um conjunto de comandos Linux para uso no dia a dia, sempre que nos esquecemos de algum em particular. Sempre que se</pre>'><a href='servidores/Linux/Comandos/comandos_lista.txt'><img src='index.php@i=text'/> comandos_lista.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>10.89KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/logs_dicas2.html'><img src='index.php@i=file'/> logs_dicas2</a></td>
+                                                
+                                <td>File</td>
+                                <td>89B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/1projeto.html'><img src='index.php@i=file'/> 1projeto</a></td>
+                                                
+                                <td>File</td>
+                                <td>59B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Scripts &Uacute;teis
+
+Listar os 6 maiores arquivos do diret&oacute;rio atual
+
+du -k * | sort -nr | cut -f2 | xargs -d &quot;\n&quot; -x du -sh | head
+ou
+du -h | sort -nr | head -6
+
+
+Listar os arquivos modificados h&aacute; mais de 4 dias. 
+
+Procurar&aacute; em /var/log e gravar&aacute; a l</pre>'><a href='servidores/Linux/Comandos/scripts_uteis.txt'><img src='index.php@i=text'/> scripts_uteis.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>537B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/Formatar&#32;pendrive.html'><img src='index.php@i=file'/> Formatar pendrive</a></td>
+                                                
+                                <td>File</td>
+                                <td>544B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/Permissoes.html'><img src='index.php@i=file'/> Permissoes</a></td>
+                                                
+                                <td>File</td>
+                                <td>495B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/swap.html'><img src='index.php@i=file'/> swap</a></td>
+                                                
+                                <td>File</td>
+                                <td>209B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/apache.html'><img src='index.php@i=file'/> apache</a></td>
+                                                
+                                <td>File</td>
+                                <td>176B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/diretorios_linux.html'><img src='index.php@i=file'/> diretorios_linux</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.45KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/gpt.html'><img src='index.php@i=file'/> gpt</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.54KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/format_usb.html'><img src='index.php@i=file'/> format_usb</a></td>
+                                                
+                                <td>File</td>
+                                <td>543B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>CRONTAB &ndash; o agendador de tarefas do linux
+4 de janeiro de 2012 By Ubuntu Dicas 15 Coment&aacute;rios
+
+por Rodolfo Silveira
+
+Ol&aacute; pessoal, estou aqui de volta fazendo um pequeno tutorial sobre o crontab o agendador de tarefas do Linux, lembrando que o cro</pre>'><a href='servidores/Linux/Comandos/cron.txt'><img src='index.php@i=text'/> cron.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>9.97KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Criar um link simb&oacute;lico na pasta /var/www/html para a pasta /var/www/local/joomla
+
+cd /var/www/html
+ln -s /var/www/local/joomla joomla
+
+ls -la
+drwxrwxr-x  3 ribafs www-data   4096 Set 29 08:24 .
+drwxr-xr-x  6 root   root       4096 Set 20 09:01 ..
+-</pre>'><a href='servidores/Linux/Comandos/link_simbolico.txt'><img src='index.php@i=text'/> link_simbolico.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>519B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Renomear arquivos recursivamente
+
+find . | sed &#039;s:\(.*\)\.php:mv &quot;\1.php&quot; &quot;\1.php4&quot;:&#039;|sh
+
+Funcionou
+find . | sed &#039;s:\(.*\)\.html;1:mv &quot;\1.html;1&quot; &quot;\1.html&quot;:&#039;|sh
+
+Funcionou
+find . | sed &#039;s:\(.*\)\;1:mv &quot;\1;1&quot; &quot;\1&quot;:&#039;|sh
+
+Fonte: http://www.bensfriends.c</pre>'><a href='servidores/Linux/Comandos/renomear&#32;recursivamente.txt'><img src='index.php@i=text'/> renomear recursivamente.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>328B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/Comandos.html'><img src='index.php@i=file'/> Comandos</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.41KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/checar_dvd.html'><img src='index.php@i=file'/> checar_dvd</a></td>
+                                                
+                                <td>File</td>
+                                <td>110B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/wget.html'><img src='index.php@i=file'/> wget</a></td>
+                                                
+                                <td>File</td>
+                                <td>20.63KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Virtual Host no ubuntu/Debian com Apache2
+
+Adaptado de:
+https://www.vivaolinux.com.br/topico/Apache-Web-Server/virtualHost
+
+Vou criar mais dois virtuais hosts:
+/backup/www - 127.0.0.1 - backup
+/var/www/local - 127.0.0.1 - local
+
+Muito &uacute;til para quem</pre>'><a href='servidores/Linux/Comandos/virtualhost.txt'><img src='index.php@i=text'/> virtualhost.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.16KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/cp_permissoes.html'><img src='index.php@i=file'/> cp_permissoes</a></td>
+                                                
+                                <td>File</td>
+                                <td>746B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Listar maiores arquivos de diret&oacute;rio
+
+Ordem crescente sem ocultos
+du --human-readable * | sort --human-numeric-sort
+
+Inclusive os ocultos
+du -h | egrep -v &quot;\./.+/&quot; | sort -h
+
+Do ordem decrescente, com ocultos
+sudo du -a /dir/ | sort -n -r | head -n </pre>'><a href='servidores/Linux/Comandos/maiores_diretorios.txt'><img src='index.php@i=text'/> maiores_diretorios.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>430B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Pequeno tutorial sobre VI/VIM
+=============================================================================== 
+
+     Vim &eacute; um editor muito poderoso que a grande quantidade de comandos para poder explicar todos em um curso como este, que foi concebid</pre>'><a href='servidores/Linux/Comandos/vi-vim.txt'><img src='index.php@i=text'/> vi-vim.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>18.14KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Formatar pendrive
+
+sudo fdisk -l	(anotar a parti&ccedil;&atilde;o: sdf1)
+sudo umount /dev/sdf1 
+sudo mkfs.vfat -n &#039;RibaFS&#039; -I /dev/sdf1 
+
+Particionar
+sudo fdisk /dev/sdf
+d
+n
+p
+1
+Enter
+Enter
+t
+l
+7
+w
+
+Formatar
+sudo mkntfs -n &#039;RIBAFS&#039; -I /dev/sdf1
+
+Comandos Linux -</pre>'><a href='servidores/Linux/Comandos/comandos2.txt'><img src='index.php@i=text'/> comandos2.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>11.12KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/UnixToolbox.html'><img src='index.php@i=file'/> UnixToolbox</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.46KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/cron.html'><img src='index.php@i=file'/> cron</a></td>
+                                                
+                                <td>File</td>
+                                <td>940B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/cron_dicas0.html'><img src='index.php@i=file'/> cron_dicas0</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.13KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='index.php@Li9zZXJ2aWRvcmVzL0xpbnV4L0NvbWFuZG9zL2NhdGFsb2djb21tYW5kcw==.html'><img src='index.php@i=folder'/> catalogcommands</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:10:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/redes_dicas.html'><img src='index.php@i=file'/> redes_dicas</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.14KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/gdisk.html'><img src='index.php@i=file'/> gdisk</a></td>
+                                                
+                                <td>File</td>
+                                <td>0B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/limpar_cache_ram.html'><img src='index.php@i=file'/> limpar_cache_ram</a></td>
+                                                
+                                <td>File</td>
+                                <td>189B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/hora_server.html'><img src='index.php@i=file'/> hora_server</a></td>
+                                                
+                                <td>File</td>
+                                <td>244B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Debian/Ubuntu
+
+Ap&oacute;s a instala&ccedil;&atilde;o do Apache
+
+adduser ribafs www-data
+
+===Setando Permiss&otilde;es
+
+Para trabalho em equipe no servidor
+
+Criar um grupo
+addgroup webdevel
+
+Adicionar cada um dos integrantes da equipe ao grupo webdevel
+addgroup ribafs webde</pre>'><a href='servidores/Linux/Comandos/perms.txt'><img src='index.php@i=text'/> perms.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.25KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='index.php@Li9zZXJ2aWRvcmVzL0xpbnV4L0NvbWFuZG9zL0Jhc2ljb3M=.html'><img src='index.php@i=folder'/> Basicos</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:10:36</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/cron_dicas2.html'><img src='index.php@i=file'/> cron_dicas2</a></td>
+                                                
+                                <td>File</td>
+                                <td>790B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/pacotes.html'><img src='index.php@i=file'/> pacotes</a></td>
+                                                
+                                <td>File</td>
+                                <td>0B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Para quebrar a senha do usu&aacute;rio do Windows com o Hiren&#039;s Boot:
+
+D&ecirc; o boot e escolha Mini Windows XP Ao iniciar o CD abra o programa &quot;HBCD Menu&quot; localizado na &aacute;rea de trabalho:
+
+Programs &gt; Passwords / Keys &gt; Windows Login &gt; NTPWEdit (Reset Xp/Vista</pre>'><a href='servidores/Linux/Comandos/quebrarsenhaWindows.txt'><img src='index.php@i=text'/> quebrarsenhaWindows.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>297B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>How to Enable or Disable Services in Ubuntu Systemd/Upstart
+Updated October 29, 2018LINUX HOWTO
+https://linoxide.com/linux-how-to/enable-disable-services-ubuntu-systemd-upstart/
+
+How to enable and disable services in  Systemd init
+
+To start a service</pre>'><a href='servidores/Linux/Comandos/servicos_boot.txt'><img src='index.php@i=text'/> servicos_boot.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.57KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Compactar e Descompactar Arquivos no Terminal do Linux
+
+
+Instalar compactadores para Linux:
+sudo apt-get install unace zip unzip p7zip-full p7zip-rar sharutils uudeview mpack arj unrar rar lzma lha lzma-dev rar unrar-free ark ncompress
+
+zip
+Compacta</pre>'><a href='servidores/Linux/Comandos/compactacao.txt'><img src='index.php@i=text'/> compactacao.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.52KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Procurando Arquivos pelo Terminal do Linux com find e locate
+
+Procurar arquivo no diret&oacute;rio atual:
+find -name &quot;arquivo.zip&quot;
+
+Procurar arquivo ignorando o case:
+find -iname &quot;Arquivo.zip&quot;
+
+Procurar arquivos que n&atilde;o tenham um nome:
+
+find -not -name &quot;n</pre>'><a href='servidores/Linux/Comandos/find_tutorial.txt'><img src='index.php@i=text'/> find_tutorial.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.17KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/logs_dicas.html'><img src='index.php@i=file'/> logs_dicas</a></td>
+                                                
+                                <td>File</td>
+                                <td>89B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/vpn-centos7.html'><img src='index.php@i=file'/> vpn-centos7</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.28KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/cron_dicas.html'><img src='index.php@i=file'/> cron_dicas</a></td>
+                                                
+                                <td>File</td>
+                                <td>790B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/data_hora.html'><img src='index.php@i=file'/> data_hora</a></td>
+                                                
+                                <td>File</td>
+                                <td>50B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/key.html'><img src='index.php@i=file'/> key</a></td>
+                                                
+                                <td>File</td>
+                                <td>719B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/Corigir&#32;pacotes&#32;quebrados.html'><img src='index.php@i=file'/> Corigir pacotes quebrados</a></td>
+                                                
+                                <td>File</td>
+                                <td>365B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/Search&#32;and&#32;Replace.html'><img src='index.php@i=file'/> Search and Replace</a></td>
+                                                
+                                <td>File</td>
+                                <td>13.28KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/bash
+# Desabilitar a ecla / que tem o keycode 191
+echo &quot;disable keyboard&quot;
+xmodmap -e &#039;keycode 191 =&#039; # ou 35 ou 0x23 ou 97
+#https://en.wikipedia.org/wiki/ASCII
+#xmodmap -pke | less
+#xmodmap -pk &gt; mykeyboard.txt
+
+# Disable
+#xmodmap -e </pre>'><a href='servidores/Linux/Comandos/key_dis.sh'><img src='index.php@i=script'/> key_dis.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>621B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Dica sobre a linguagem C:
+
+Precisei criar uma m&aacute;quina virtual com o Windows dentro do VirtualBox no Linux para minha esposa usar o MS Office.
+Ent&atilde;o para facilitar seu acesso criei um script shell que abre a m&aacute;quina virtual e o coloquei na &aacute;rea de</pre>'><a href='servidores/Linux/Comandos/Dica&#32;sobre&#32;a&#32;linguagem&#32;C.txt'><img src='index.php@i=text'/> Dica sobre a linguagem C.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.16KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>=== Alguns comandos do Linux, do FreeBSD e do OpenBSD
+
+A maioria dos comandos funciona de forma id&ecirc;ntica em Linux e BSD
+Mas existem pequenas varia&ccedil;&otilde;es especificamente em arquivos de configura&ccedil;&atilde;o
+Linux e OpenBSD geralmente armazenam os arquivos d</pre>'><a href='servidores/Linux/Comandos/comandos.txt'><img src='index.php@i=text'/> comandos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>9.43KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/java.html'><img src='index.php@i=file'/> java</a></td>
+                                                
+                                <td>File</td>
+                                <td>219B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/No&#32;boot&#32;device&#32;available.odt'><img src='index.php@i=file'/> No boot device available.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>306.12KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Linux/Comandos/nano.html'><img src='index.php@i=file'/> nano</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.24KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

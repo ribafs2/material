@@ -1,0 +1,790 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+        
+<style>
+a:link {
+  color: red;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: green;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: black;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+a:active {
+  color: yellow;
+  background-color: transparent;
+  text-decoration: underline;
+}
+</style>         
+	</head>
+    <body style="font-size: 15px;">
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='index.php@Li9zZXJ2aWRvcmVz.html'>Index of /material/index.phpservidores/Linux/</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://www.youtube.com/watch?v=6D6L9Wml1oY
+</pre>'><a href='servidores/Linux/DualBoot.txt'><img src='index.php@i=text'/> DualBoot.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>44B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Para limpar o cache da RAM
+
+sudo sysctl -w vm.drop_caches=3
+
+
+Criar um script
+
+sudo nano /usr/local/bin/m
+
+sudo sysctl -w vm.drop_caches=3
+
+sudo chmod +x /usr/local/bin/m
+
+Rodar:
+
+sudo m
+
+
+</pre>'><a href='servidores/Linux/RAM_limparcache.txt'><img src='index.php@i=text'/> RAM_limparcache.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>189B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Segui os passos e apenas removi a senha do chaveiro
+
+https://diolinux.com.br/tutoriais/chrome-solicitando-senha-ao-iniciar.html
+</pre>'><a href='servidores/Linux/RemoverChaveiroChrome.txt'><img src='index.php@i=text'/> RemoverChaveiroChrome.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>128B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Default do Mint 20
+
+PS1=&#039;${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ &#039;
+
+Custom
+
+PS1=&quot;\[\e[33mNb-\]\W \[\e[37m\]$ &quot;
+
+O mais simples poss&iacute;vel
+
+PS1=&quot;$ : &quot;
+echo $PS1
+
+cd
+nano .bashrc
+
+
+PS1=&#039;$PWD : &#039;</pre>'><a href='servidores/Linux/PromptCustom.txt'><img src='index.php@i=text'/> PromptCustom.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>574B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='index.php@Li9zZXJ2aWRvcmVzL0xpbnV4L0Rlc2t0b3A=.html'><img src='index.php@i=folder'/> Desktop</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:11:06</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>timedatectl set-local-rtc 1 --adjust-system-clock
+</pre>'><a href='servidores/Linux/RelogioDualboot.txt'><img src='index.php@i=text'/> RelogioDualboot.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>50B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Instalar Navegador Edge no Ubuntu
+
+curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor &gt; microsoft.gpg
+sudo install -o root -g root -m 644 microsoft.gpg /etc/apt/trusted.gpg.d/
+
+sudo sh -c &#039;echo &quot;deb [arch=amd64] https://packages.m</pre>'><a href='servidores/Linux/InstalarEdge.txt'><img src='index.php@i=text'/> InstalarEdge.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>830B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+Checar arquitetura
+
+sudo dpkg --print-architecture
+
+20 para 20.1
+
+sudo sed -i &#039;s/ulyana/ulyssa/g&#039; /etc/apt/sources.list.d/official-package-repositories.list
+
+sudo apt update
+
+sudo apt dist-upgrade
+
+sudo reboot
+
+https://easylinuxtipsproject.blogspot.</pre>'><a href='servidores/Linux/UpgradeMint.txt'><img src='index.php@i=text'/> UpgradeMint.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>278B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>sudo apt remove --purge gnome-keyring
+
+Continuar
+Continuar
+
+Reinstalar
+sudo apt-get install gnome-keyring
+</pre>'><a href='servidores/Linux/chaveiro.txt'><img src='index.php@i=text'/> chaveiro.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>106B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Corrigindo o erro
+The user specified as a definer (&#039;mysql.infoschema&#039;@&#039;localhost&#039;) does not exist
+
+mysql -uroot
+use mysql;
+
+select User, plugin, authentication_string from mysql.user where user like &#039;mysql.%&#039;;
+
+update mysql.user set plugin = &#039;caching</pre>'><a href='servidores/Linux/mysql-dicas.txt'><img src='index.php@i=text'/> mysql-dicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.67KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>CTRL+R - digite algo - traz &uacute;timo comando executado que tenha o termo (n&atilde;o somente hoje)
+
+history - lista &uacute;ltimos comandos executados
+history | grep algo
+
+CTRL+L - limpa tela
+
+Copiar e colar no terminal:
+
+Selecionar em qualquer programa ou mesmo n</pre>'><a href='servidores/Linux/terminal-dicas.txt'><img src='index.php@i=text'/> terminal-dicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>293B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Refor&ccedil;ando a seguran&ccedil;a de servidores Ubuntu 20.04
+
+Proteger seu servidor Linux &eacute; importante para proteger seus dados, propriedade intelectual e tempo das m&atilde;os de crackers (hackers). O administrador do sistema &eacute; respons&aacute;vel pela seguran&ccedil;a da m</pre>'><a href='servidores/Linux/DicasUbuntu20.04.txt'><img src='index.php@i=text'/> DicasUbuntu20.04.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>18.29KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Executar o fdisk
+
+/sbin/fdisk
+
+Comandos de rede como ifconfig
+sudo apt install net-tools
+
+/sbin/ifconfig
+
+Configurar Firefox para uma fonte mais vis&iacute;vel como a Fira Code ou Days One e em Avan&ccedil;ado
+Desmarcar: Permitir que as p&aacute;ginas escolham suas pr</pre>'><a href='servidores/Linux/Debian10-dicas.txt'><img src='index.php@i=text'/> Debian10-dicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>334B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='index.php@Li9zZXJ2aWRvcmVzL0xpbnV4L0NvbWFuZG9z.html'><img src='index.php@i=folder'/> Comandos</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-07-26 11:25:59</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Ubuntu 20.10
+
+== Sudo sem senha
+
+sudo bash -c &#039;echo &quot;$(logname) ALL=(ALL:ALL) NOPASSWD: ALL&quot; | (EDITOR=&quot;tee -a&quot; visudo)&#039;
+
+== Setar uma senha para o root
+
+sudo su
+passwd root
+
+sudo apt remove --purge timeshift
+
+== Customizar o Prompt de comandos
+
+nano</pre>'><a href='servidores/Linux/1PosInstall.txt'><img src='index.php@i=text'/> 1PosInstall.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.99KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Recuperando um linux do windows
+
+Ontem desinstalei algum programas do meu Linux Mint 20.1 com cinnamon atrav&eacute;s do menu. Bot&atilde;o direito sobre o programa - Desinstalar. Desinstalei v&aacute;rios que n&atilde;o estava precisando para aliviar o HD.
+
+Lembro que um</pre>'><a href='servidores/Linux/RecuperandoLinux.txt'><img src='index.php@i=text'/> RecuperandoLinux.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>12.76KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Dica para Linux
+
+Op&ccedil;&otilde;es para ter o terminal dividido em paineis na horizontala e/ou na vertical
+
+## tmux
+```php
+    Ctrl-B % for a vertical split (one shell on the left, one shell on the right)
+    Ctrl-B&quot; for a horizontal split (one shell at the</pre>'><a href='servidores/Linux/terminal_split.txt'><img src='index.php@i=text'/> terminal_split.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>515B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Processador de textos leve
+
+sudo apt install calligra
+
+
+
+Navegadores
+
+sudo apt update &amp;&amp; sudo apt install midori
+
+Vivaldi
+
+Falkon
+sudo apt update &amp;&amp; sudo apt install falkon
+
+https://www.torproject.org/
+
+
+</pre>'><a href='servidores/Linux/Leves.txt'><img src='index.php@i=text'/> Leves.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>204B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Compartilhar rede wifi entre windows e linux
+
+No Linux (Mint)
+
+sudo apt install samba
+
+sudo apt install caja-share
+
+Abrir o nemo
+
+Selecionar a pasta a ser compartilhada
+Clicar nela com o bot&atilde;o direito
+Op&ccedil;&otilde;es de compartilhamento
+Clicar no bot&atilde;o Co</pre>'><a href='servidores/Linux/Rede&#32;wifiCompartilhar.txt'><img src='index.php@i=text'/> Rede wifiCompartilhar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>529B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Filemanagers Linux
+
+nautilus
+krusader
+pcman
+xfe
+nemo
+thunar
+caja
+deepin
+polo
+pantheon
+4pane
+jfileprocessor
+qtfm
+fman
+lirifiles
+
+https://www.tecmint.com/top-best-lightweight-linux-file-managers/
+</pre>'><a href='servidores/Linux/filemanagers.txt'><img src='index.php@i=text'/> filemanagers.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>194B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Compara&ccedil;&atilde;o entre Windows e Linux
+
+Especialmente no que tange &agrave; programa&ccedil;&atilde;o para PHP
+
+A compara&ccedil;&atilde;o foi usando Windows 10 e Linux Mint 20.1
+
+Para quem nunca usou os dois ambientes n&atilde;o tem como comparar, apenas acredita ou n&atilde;o.
+
+Me parece que q</pre>'><a href='servidores/Linux/WindowsXLinux.txt'><img src='index.php@i=text'/> WindowsXLinux.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>5.46KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Impressora tanque de tinta Canon G3110
+
+Ubuntu 20.04, Mint 20 e similares
+
+sudo add-apt-repository ppa:thierry-f/fork-michael-gruz
+sudo apt update
+sudo apt-get install cnijfilter2 scangearmp2
+	Abrir synapitic e pesquisar
+	cnijfilte
+Selecionar mg3100 </pre>'><a href='servidores/Linux/Impr-scanner-canon.txt'><img src='index.php@i=text'/> Impr-scanner-canon.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>434B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Mudar para que o Windows seja o sistema default
+
+Por padr&atilde;o, o Mint deixa a si como o sistema default, de forma que se n&atilde;o escolhermos ele ser&aacute; aberto
+
+Para alterar para que o Windows seja o default:
+
+Verifique o n&uacute;mero do windows no menu do boot</pre>'><a href='servidores/Linux/BootSequencia.txt'><img src='index.php@i=text'/> BootSequencia.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>481B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Dicas sobre o Ubuntu Server
+
+Gerenciando Grupos de Pacotes
+
+Ap&oacute;s a instala&ccedil;&atilde;o &eacute; confort&aacute;vel usar:
+
+tasksel
+
+Para remover ou instalar grupos de pacotes.
+
+Configurar fusos hor&aacute;rios:
+dpkg-reconfigure tzdata
+
+
+Comandos:
+
+Desligar: poweroff, halt ou</pre>'><a href='servidores/Linux/UbuntuDicas.txt'><img src='index.php@i=text'/> UbuntuDicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.57KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Recupera&ccedil;&atilde;o de dados com QPhotorec ( testdisk ) no Linux
+
+O Qphotorec &eacute; uma GUI em Qt para o testdisk/photorec a melhor ferramenta de recupera&ccedil;&atilde;o de dados no mundo Linux, confira nessa mat&eacute;ria como instalar na sua distribui&ccedil;&atilde;o Linux.
+
+Recomen</pre>'><a href='servidores/Linux/Qphotorec.txt'><img src='index.php@i=text'/> Qphotorec.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.39KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Upgrade kernel mint
+
+Ver o atual
+uname -a (4.15.0)
+
+Baixar:
+wget http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.19/linux-headers-4.19.0-041900_4.19.0-041900.201810221809_all.deb \\ http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.19/linux-headers-4</pre>'><a href='servidores/Linux/KernelUpgradeMint.txt'><img src='index.php@i=text'/> KernelUpgradeMint.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1014B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Compartilhando pastas entre linux e windows
+
+Supondo duas m&aacute;quinas
+
+Linux com Ubuntu 20.10 - 192.168.0.5, compartilhar a pasta /home/ribafs/backup
+
+Windows 10
+
+## No Ubuntu
+
+- Instalar o samba
+
+sudo apt install samba
+
+- Abrir o Nautilis
+- Selecion</pre>'><a href='servidores/Linux/CompartilharLinuxWindows.txt'><img src='index.php@i=text'/> CompartilharLinuxWindows.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.02KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='index.php@Li9zZXJ2aWRvcmVzL0xpbnV4L1ByZWZlcmlkb3M=.html'><img src='index.php@i=folder'/> Preferidos</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:10:58</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

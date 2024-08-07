@@ -1,0 +1,2152 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+        
+<style>
+a:link {
+  color: red;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: green;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: black;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+a:active {
+  color: yellow;
+  background-color: transparent;
+  text-decoration: underline;
+}
+</style>         
+	</head>
+    <body style="font-size: 15px;">
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li9hcG9pbw==.html'>Ribamar FS - Material Bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>O que estudar para se valorizar para o mercado?
+
+Gostaria de compartilhar algum conhecimento e experi&ecirc;ncia sobre o assunto com a inten&ccedil;&atilde;o de provocar colegas que passaram por experi&ecirc;ncias parecidas e que podem colaborar para que ajudemos os coleg</pre>'><a href='trabalho/SePrepararMercado.txt'><img src='trabalho/index.html@i=text'/> SePrepararMercado.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>8.06KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Eles&#32;querem&#32;acabar&#32;com&#32;a&#32;sua&#32;carreira.odt'><img src='trabalho/index.html@i=file'/> Eles querem acabar com a sua carreira.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>20.35KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Dormir&#32;Bem&#32;Restaura&#32;e&#32;Revigora.pdf'><img src='trabalho/index.html@i=file'/> Dormir Bem Restaura e Revigora.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>38.39KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/GitHub&#32;emprego.odt'><img src='trabalho/index.html@i=file'/> GitHub emprego.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>21.21KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Uma Dica se voc&ecirc; n&atilde;o sabe onde focar...
+
+Renzo do Python Pro
+
+N&atilde;o existe &aacute;rea mais abundante do que a tecnologia.
+
+Isso &eacute; um fato e eu, sempre que posso, repito. Para voc&ecirc; ter uma ideia, em 2020, a quantidade de vagas no setor aumentou mais de </pre>'><a href='trabalho/TIAbundante.txt'><img src='trabalho/index.html@i=text'/> TIAbundante.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.19KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Aviato Creavite atualizou a foto do perfil.
+tdersoonpS71htgu3t30imf5l550684laa9071m0 7  &middot;
+O que &eacute; o com&eacute;rcio electr&oacute;nico?
+Comercio Electr&oacute;nico (E-Commerce)
+A Internet tem mudado o modo de como executamos as nossas tarefas do dia-a-dia, ela tem s</pre>'><a href='trabalho/Ecommerce.txt'><img src='trabalho/index.html@i=text'/> Ecommerce.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>5.59KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Cursos Gratuitos com ou sem certificado
+
+21 cursos gratuitos com certificado
+
+https://www.youtube.com/watch?v=tcjOMaU5k7c
+
+Cursos online gr&aacute;tis e com certificado
+
+https://www.youtube.com/watch?v=VDelkPk7lV0
+
+11 SITES PARA FAZER CURSOS ONLINE GRATU</pre>'><a href='trabalho/CursosGratuitos.txt'><img src='trabalho/index.html@i=text'/> CursosGratuitos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>814B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Miraldino Paulo D&oacute;ria
+
+UM DIA A VIDA VAI TE ENSINAR DE FORMA OBJECTIVA QUE :
+.
+1- Que nem todos ter&atilde;o emprego, mas sim Trabalho.
+.
+2- Que alguns quando terminarem seus estudos, se n&atilde;o forem atr&aacute;s das oportunidades ficaram em casa com os diplomas.</pre>'><a href='trabalho/Recomendacoes2.txt'><img src='trabalho/index.html@i=text'/> Recomendacoes2.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.54KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Grupos: PHP Brasil e Clube dos Programadores
+
+Ajuda para encontrar um Trabalho
+
+- Tenho experi&ecirc;ncia com programa&ccedil;&atilde;o web h&aacute; mais de 20 anos:
+  - Focado no back-end: PHP, PostgreSQL, MySQL, Laravel, Codeigniter, Joomla, Bootstrap, Javascript, etc
+-</pre>'><a href='trabalho/PedidoTrabalho.txt'><img src='trabalho/index.html@i=text'/> PedidoTrabalho.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>384B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Aviato Creavite
+  &middot;
+15 motivos incr&iacute;veis para voc&ecirc; investir num website para o seu neg&oacute;cio
+Antes de tudo, uma pergunta simples, o que &eacute; um website? Em sua forma simples, um site &eacute; uma ou conjunto de p&aacute;ginas que agregam informa&ccedil;&atilde;o e est&atilde;o as</pre>'><a href='trabalho/Site.txt'><img src='trabalho/index.html@i=text'/> Site.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>16.37KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/GestaoVendaExcel.tzt.html'><img src='trabalho/index.html@i=file'/> GestaoVendaExcel.tzt</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.46KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://www.youtube.com/watch?v=zasMiQIfTPk
+
+https://github.com/ribafs/QuantoCobrarPorSite
+
+https://www.youtube.com/watch?v=5LVqVcl9ICY
+
+
+</pre>'><a href='trabalho/QuantoCobrar.txt'><img src='trabalho/index.html@i=text'/> QuantoCobrar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>138B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/CriarVideos.docx'><img src='trabalho/index.html@i=file'/> CriarVideos.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.81KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li95b3VyX2xpZmUucG5n"/>'><a href='trabalho/your_life.png'><img src='trabalho/index.html@i=image'/> your_life.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>187.25KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Daniel da Silva
+Vale a pena tamb&eacute;m, fazer coment&aacute;rios relevantes nos posts.
+
+
+</pre>'><a href='trabalho/Participacao.txt'><img src='trabalho/index.html@i=text'/> Participacao.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>80B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Entendendo&#32;a&#32;Sefaz.odt'><img src='trabalho/index.html@i=file'/> Entendendo a Sefaz.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>26.37KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>5 Must-Have Skills For Backend Developers 2021
+
+    Technical Skills
+    Detailed Oriented
+    Communication Skills
+    Research Skills
+    Team Player
+    
+https://masteringbackend.com/posts/5-must-have-skills-for-a-backend-developer
+    
+</pre>'><a href='trabalho/Skils.txt'><img src='trabalho/index.html@i=text'/> Skils.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>240B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Tentando ajudar
+Exemplos grosseiros:
+Algo assim: se est&aacute; claro ent&atilde;o &eacute; de dia.
+Se est&aacute; escuro ent&atilde;o &eacute; de noite.
+Se tem sangue ent&atilde;o est&aacute; vivo.
+Se n&atilde;o tem sangue est&aacute; morto.
+Isso &eacute; um racioc&iacute;nio de se ... ent&atilde;o ...
+Algo como um trabalho d</pre>'><a href='trabalho/Logica.txt'><img src='trabalho/index.html@i=text'/> Logica.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.52KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Preciso de Ingl&ecirc;s para a Primeira Vaga?
+
+Renzo do Python Pro
+
+Fala Ribamar,
+
+Voc&ecirc; sabe falar ingl&ecirc;s? Nem que seja no embromation? Voc&ecirc; acha que saber falar ingl&ecirc;s &eacute; necess&aacute;rio para conquistar sua primeira vaga como programador?
+
+Segundo pesqui</pre>'><a href='trabalho/SabeFalarIngles.txt'><img src='trabalho/index.html@i=text'/> SabeFalarIngles.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.66KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/TrabalhoProg.docx'><img src='trabalho/index.html@i=file'/> TrabalhoProg.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>639.64KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Tudo o que voc&ecirc; precisa saber sobre trabalho remoto
+
+Por conta da dissemina&ccedil;&atilde;o cont&iacute;nua da COVID-19, muitas empresas pediram que os funcion&aacute;rios fa&ccedil;am trabalho remoto. &Eacute; prov&aacute;vel que outras sigam o mesmo caminho enquanto os efeitos do v&iacute;ru</pre>'><a href='trabalho/TrabalhoRemoto..txt'><img src='trabalho/index.html@i=text'/> TrabalhoRemoto..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>13.02KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Aviato Creavite atualizou a foto do perfil.
+15 min  &middot;
+5 dicas para conseguir um bom est&aacute;gio👨🏻&zwj;💻🤓
+Conquistar a primeira experi&ecirc;ncia #profissional para adquirir experi&ecirc;ncia na &aacute;rea pode parecer dif&iacute;cil - e &agrave;s vezes &eacute; mesmo. Por is</pre>'><a href='trabalho/Estagio.txt'><img src='trabalho/index.html@i=text'/> Estagio.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.35KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Op&ccedil;&otilde;es de trabalho remoto:
+
+- Canal
+  Cursos
+
+- Udemy
+
+- Workana como escritot e como programador freelancer
+
+- 
+
+</pre>'><a href='trabalho/OpcoesTrabalho.txt'><img src='trabalho/index.html@i=text'/> OpcoesTrabalho.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>116B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/SkillstoSuccessful&#32;Freelancer.odt'><img src='trabalho/index.html@i=file'/> SkillstoSuccessful Freelancer.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>146.2KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/AbrangenciaProg.html'><img src='trabalho/index.html@i=file'/> AbrangenciaProg</a></td>
+                                                
+                                <td>File</td>
+                                <td>739B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/DevelopersGuideInterviews.pdf'><img src='trabalho/index.html@i=file'/> DevelopersGuideInterviews.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.77MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9hcnJ1bWFyLWpvYi5qcGc="/>'><a href='trabalho/arrumar-job.jpg'><img src='trabalho/index.html@i=image'/> arrumar-job.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>56.59KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Nem sempre vamos estar em salas com ar condicionado, mesas e cadeiras com ergonomia pensada. O &quot;campo&quot; sempre chama e temos que estar dispostos e o mais preparado o poss&iacute;vel. Se poss&iacute;vel leve consigo um sorriso no rosto. Fa&ccedil;a o melhor que puder na</pre>'><a href='trabalho/Disposicao.txt'><img src='trabalho/index.html@i=text'/> Disposicao.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>339B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Desenvolvedor&#32;fullstack.odt'><img src='trabalho/index.html@i=file'/> Desenvolvedor fullstack.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>44.28KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+Engenharia de Dados
+
+💡 &Eacute; incr&iacute;vel como a procura por engenheiro de dados tem aumentado a cada dia, temos visto empresas buscando esse perfil profissional cada vez mais para resolver seus problemas com a grande quantidade de dados gerados nesses</pre>'><a href='trabalho/Vagas..txt'><img src='trabalho/index.html@i=text'/> Vagas..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.29KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/UdemyChecklist.pdf'><img src='trabalho/index.html@i=file'/> UdemyChecklist.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>979.97KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>5 Coisas Que Matam a Sua Produtividade - Wendel Carvalho
+https://www.youtube.com/watch?v=T17-Z_2P38o
+</pre>'><a href='trabalho/Produtividade.txt'><img src='trabalho/index.html@i=text'/> Produtividade.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>101B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Recomenda&ccedil;&otilde;es para obter o maior proveito com os estudos
+
+- Levar bem a s&eacute;rio os estudos
+
+- Cuide bem da sua sa&uacute;de e qualidade de vida para ter o melhor rendimento
+
+- Foque em boas caracter&iacute;sticas, que colaboram com os estudos:
+    - Intelig&ecirc;</pre>'><a href='trabalho/RecomendacoesEstudo.txt'><img src='trabalho/index.html@i=text'/> RecomendacoesEstudo.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>5.27KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&Eacute; importante usar as ferramentas, linguagens e servi&ccedil;os mais populares
+
+- Assim usamos algo que os clientes j&aacute; usam, geralmente
+- Usamos as mais justas em termos financeiros, geralmente
+- Usamos as queu todos conhecem
+
+E n&atilde;o exigimos que o client</pre>'><a href='trabalho/Recomendacoes.txt'><img src='trabalho/index.html@i=text'/> Recomendacoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>292B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Recomenda&ccedil;&otilde;es diversas para um melhor c&oacute;digo
+
+- Tenha em mente uma atitude voltada para a produtividade nas v&aacute;rias &aacute;reas que trabalha e estuda
+
+- Usar uma boa IDE (Eclipse PDT ou Netbeans) ou editor de c&oacute;digo (VSCode)
+
+- Usar bons templates p</pre>'><a href='trabalho/RecomendacoesCodigo.txt'><img src='trabalho/index.html@i=text'/> RecomendacoesCodigo.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.81KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/entrevista&#32;de&#32;emprego.odt'><img src='trabalho/index.html@i=file'/> entrevista de emprego.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>94.37KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Renzo do Python Pro
+
+Faaaala, Ribamar!!!
+
+E ai, o que achou da primeira aula da Jornada Rumo a Primeira Vaga?
+
+Quanto mais volume de conhecimento voc&ecirc; tiver, maior s&atilde;o as suas chances de conseguir a sua t&atilde;o sonhada primeira vaga, certo? ERRADO!
+
+O</pre>'><a href='trabalho/CapacidadeEntrega.txt'><img src='trabalho/index.html@i=text'/> CapacidadeEntrega.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.25KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/carreira&#32;de&#32;sucesso.odt'><img src='trabalho/index.html@i=file'/> carreira de sucesso.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>33.22KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Melorando a Performance
+
+- Usar bancos de dados somente quando necess&aacute;rio
+- Otimizar, minimizar e reduzir consultas ao banco
+- Da mesma forma muito cuidado com servi&ccedil;os externos, trate com cuidado estes
+- Muito cuidado com os loops, especialmente t</pre>'><a href='trabalho/Performance.txt'><img src='trabalho/index.html@i=text'/> Performance.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.18KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='trabalho/index.html@Li9Nb2RlbG9z.html'><img src='trabalho/index.html@i=folder'/> Modelos</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 08:17:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Clube dos Programadores
+Lu&iacute;s Henrique Da Silva Rech  &middot; odsStrponeamth1a79f861u50lt61tt208l92t ia3  &middot;
+PLANO A PROVA DE DESCULPAS
+1- ESCOLHA SEU NICHO
+Ex:
+Imobili&aacute;ria
+Delivery
+Clinicas de Est&eacute;tica
+Odontologia
+Moveleiro
+Advocacia
+Medicina em geral
+</pre>'><a href='trabalho/InfosTrabalho.txt'><img src='trabalho/index.html@i=text'/> InfosTrabalho.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.63KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Shivam Miguel
+Se estudar com qualidade, e construir bons projetos para mostrar ao publico, principalmente no LinkedIn e no Github v&atilde;o te chamar, mas antes de tudo seleciona as empresas que desejas atuar e faca conex&atilde;o com gente que j&aacute; trabalha la,</pre>'><a href='trabalho/PrimeiroEmprego.txt'><img src='trabalho/index.html@i=text'/> PrimeiroEmprego.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>283B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9JTG92ZVByb2dyYW1taW5nLmpwZw=="/>'><a href='trabalho/ILoveProgramming.jpg'><img src='trabalho/index.html@i=image'/> ILoveProgramming.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>60.35KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9BcHJlbmRlci5qcGc="/>'><a href='trabalho/Aprender.jpg'><img src='trabalho/index.html@i=image'/> Aprender.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>39.5KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Trabalhando&#32;com&#32;a&#32;MÃÂÃÂ¡xima&#32;EficiÃÂÃÂªncia.odt'><img src='trabalho/index.html@i=file'/> Trabalhando com a MÃÂÃÂ¡xima EficiÃÂÃÂªncia.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>25.17KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Stephen Curry: Por que devemos contrat&aacute;-lo?
+
+Bill Gates: Voc&ecirc; deve olhar para os c&oacute;digos que eu constru&iacute;. Fa&ccedil;o programas de software que v&atilde;o muito al&eacute;m de todas as aulas das quais j&aacute; participei. Acredito que fiquei melhor com o tempo, ent&atilde;o </pre>'><a href='trabalho/PorqueContratalo.txt'><img src='trabalho/index.html@i=text'/> PorqueContratalo.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.25KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Kim Flex compartilhou uma foto.Aviato Creative
+Administrador
+  &middot; pSestnoordat 5814g1f9l8mu13aui6tf0h44374lf  &middot;
+Como se Tornar um Desenvolvedor Web do Zero e Encontrar um Emprego
+
+Matondo Jo&atilde;o atualizou a foto do perfil.
+pSestnoordat 5814g1f9l8mu13</pre>'><a href='trabalho/DesenvolvedordoZero.txt'><img src='trabalho/index.html@i=text'/> DesenvolvedordoZero.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.95KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Guia_Pratico_para_a_Independencia_Financeira-fb.pdf'><img src='trabalho/index.html@i=file'/> Guia_Pratico_para_a_Independencia_Financeira-fb.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.89MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Kim Flex compartilhou uma foto.Aviato Creative
+Administrador
+  &middot; Sprdtsonoe7lcatc30844ca81hg1m7t th289hh4f0  &middot;
+O Que &eacute; um Desenvolvedor Full-Stack? Um Guia para o Desenvolvimento Full-Stack
+
+Matondo Jo&atilde;o atualizou a foto do perfil.
+Sprdtsonoe7lca</pre>'><a href='trabalho/full-stack.txt'><img src='trabalho/index.html@i=text'/> full-stack.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.71KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Publicar no blog
+
+Conhecimentos/habilidades que valorizam um programador de PHP?
+
+Geralmente grandes e organizadas empresas tem fun&ccedil;&otilde;es separadas para cada um e trabalham em conjunto:
+
+- Analista
+- Programador back-end
+- Programador back-end
+- DBA
+</pre>'><a href='trabalho/Valorizacao.txt'><img src='trabalho/index.html@i=text'/> Valorizacao.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.29KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Criador&#32;de&#32;ConteÃÂÃÂºdo.odt'><img src='trabalho/index.html@i=file'/> Criador de ConteÃÂÃÂºdo.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>341.57KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/ConseguirEmprego.pdf'><img src='trabalho/index.html@i=file'/> ConseguirEmprego.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>75.75KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Como&#32;emitir&#32;nota&#32;fiscal-pessoafisica.odt'><img src='trabalho/index.html@i=file'/> Como emitir nota fiscal-pessoafisica.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>917.88KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zZW5pb3IuanBn"/>'><a href='trabalho/senior.jpg'><img src='trabalho/index.html@i=image'/> senior.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>78.05KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Renzo do Python Pro
+
+Deixa eu te fazer uma pergunta: voc&ecirc; tem tempo sobrando?
+
+Vivemos na era da urg&ecirc;ncia. Dificilmente sobra tempo no dia da grande maioria das pessoas. Imagino que, com voc&ecirc;, n&atilde;o seja diferente.
+
+A vida cotidiana possui muitas r</pre>'><a href='trabalho/TemTempoparaEstudar.txt'><img src='trabalho/index.html@i=text'/> TemTempoparaEstudar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.22KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Javascript Brasil
+Raimundo Guimar&atilde;es  &middot; 2 h  &middot;
+Canal compilados:
+Pesquisa revela o que os desenvolvedores fazem na maior parte do dia
+Se voc&ecirc; est&aacute; entrando na &aacute;rea de desenvolvimento e acha que vai programar desde a hora em que entra no escrit</pre>'><a href='trabalho/Distribuicoes.txt'><img src='trabalho/index.html@i=text'/> Distribuicoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.75KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Como&#32;criar&#32;um&#32;Curso&#32;Online.docx'><img src='trabalho/index.html@i=file'/> Como criar um Curso Online.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>15.56KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Entrevista e tal
+
+- As dificuldades existem, &eacute; um fato, mas precisamos melhorar a n&oacute;s mesmos para superar isso.
+- Na entrevista voc&ecirc; deve dizer qual seu prop&oacute;sito de vida, se voc&ecirc; pensa num todo, que seu trabalho pode proporcionar algo de bom pa</pre>'><a href='trabalho/Entrevista.txt'><img src='trabalho/index.html@i=text'/> Entrevista.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.43KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/EstÃÂÃÂ­mulo&#32;para&#32;estudar.pdf'><img src='trabalho/index.html@i=file'/> EstÃÂÃÂ­mulo para estudar.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>39.14KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&quot;* VOC&Ecirc; SABIA * que seu corpo &eacute; uma m&aacute;quina perfeita que tem a capacidade de regenerar, desinflar, desintoxicar, reparar e curar.
+ * VOC&Ecirc; SABIA * que temos mais bact&eacute;rias e v&iacute;rus do que c&eacute;lulas humanas e que ambos s&atilde;o vitais para nossa exist</pre>'><a href='trabalho/MaquinaPerfeita.txt'><img src='trabalho/index.html@i=text'/> MaquinaPerfeita.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.14KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Treinamento Admir&aacute;vel Emprego Novo
+https://www.youtube.com/watch?v=mMtyFpjqS3M&amp;t=122s
+
+
+10 melhores sites de emprego
+https://www.youtube.com/watch?v=vb7djp4ToGw
+
+5 melhores sites de emprego
+https://www.youtube.com/watch?v=b9hiTToNV40
+
+Curr&iacute;culo pri</pre>'><a href='trabalho/Emprego.txt'><img src='trabalho/index.html@i=text'/> Emprego.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.23KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Sucesso e ser bem sucedido
+
+Felicidade &eacute; aprender a viver 100% aqui e agora
+
+Sucesso &eacute; obter o que voc&ecirc; quer.
+
+A principal causa do insucesso:
+
+A principal causa &eacute; o que acreditamos
+
+N&atilde;o existe fracasso do ponto de vista psicol&oacute;gico. Cada erro </pre>'><a href='trabalho/SucessoLairRibeiro.txt'><img src='trabalho/index.html@i=text'/> SucessoLairRibeiro.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.64KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/contribuir&#32;com&#32;Open&#32;Source.docx'><img src='trabalho/index.html@i=file'/> contribuir com Open Source.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>19.71KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Galera, foquem no ingl&ecirc;s, zerem o Duolingo, assistam s&eacute;ries em ingl&ecirc;s! Trabalho no Brasil tem,
+Mas fora tem MUITO mais..
+</pre>'><a href='trabalho/Ingles.txt'><img src='trabalho/index.html@i=text'/> Ingles.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>124B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Freelancer.md'><img src='trabalho/index.html@i=file'/> Freelancer.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.17KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/primeira&#32;entrevista&#32;de&#32;emprego.odt'><img src='trabalho/index.html@i=file'/> primeira entrevista de emprego.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>94.81KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/FrasesMotivacionais.pdf'><img src='trabalho/index.html@i=file'/> FrasesMotivacionais.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>101.16KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Nerds de Neg&oacute;cios
+https://www.youtube.com/channel/UCbTAwyq6nWOLnFag-PR0XVw
+
+Como Criar um Perfil Campe&atilde;o no Linkedin
+https://www.youtube.com/watch?v=O-3sQDCY5DU
+
+Aul&atilde;o de Linkedin - tenha um perfil campe&atilde;o
+https://www.youtube.com/watch?v=zOR1y7Vb</pre>'><a href='trabalho/Referencias.txt'><img src='trabalho/index.html@i=text'/> Referencias.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>547B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/ser&#32;um&#32;programador&#32;melhor.docx'><img src='trabalho/index.html@i=file'/> ser um programador melhor.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>11.29KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Valor do conhecimento e da experi&ecirc;ncia
+
+O motor de uma navio gigante quebrou e ningu&eacute;m p&ocirc;de consert&aacute;-lo, ent&atilde;o eles contrataram um engenheiro mec&acirc;nico com mais de 40 anos de experi&ecirc;ncia.
+
+Ele inspecionou o motor com muito cuidado, de cima a </pre>'><a href='trabalho/ValorConhecimento..txt'><img src='trabalho/index.html@i=text'/> ValorConhecimento..txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.11KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Matondo Jo&atilde;o compartilhou uma foto.
+Administrador
+  &middot; 1 minuto  &middot;
+Ol&aacute;🙋🏻&zwj;♂️,Programadores👨🏻&zwj;💻
+Confira este artigo sobre como criar um curr&iacute;culo📕📕 matador de desenvolvedor de software🤓🤓 contemplando aspectos que </pre>'><a href='trabalho/Curriculo2.txt'><img src='trabalho/index.html@i=text'/> Curriculo2.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.54KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Boas informa&ccedil;&otilde;es sobre Trabalho
+
+E como arrumar um
+
+- Dicas sobre Entrevistas
+- Modelo e dicas sobre curr&iacute;culos
+- Dicas sobre Emprego
+- Como conseguir um emprego
+- Conseguir um emprego sem experi&ecirc;ncia
+- Sobre a primeira vaga
+- V&aacute;rios artigos s</pre>'><a href='trabalho/LEIAME.txt'><img src='trabalho/index.html@i=text'/> LEIAME.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>853B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9uaXZlaXMuanBn"/>'><a href='trabalho/niveis.jpg'><img src='trabalho/index.html@i=image'/> niveis.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>51.58KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Admir&aacute;vel Emprego Novo
+9 de janeiro de 2019  &middot;
+⁉️VOC&Ecirc; N&Atilde;O CONSEGUE EMPREGO NOVO POR ALGUM DOS 7 MOTIVOS ABAIXO?
+1. N&atilde;o sou chamado por causa da minha idade
+2. N&atilde;o sou chamado porque n&atilde;o tenho experi&ecirc;ncia comprovada
+3. N&atilde;o sou chamado por</pre>'><a href='trabalho/EmpregoNovo.txt'><img src='trabalho/index.html@i=text'/> EmpregoNovo.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>5.25KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Preciso ser Fullstack para conquistar a Primeira Vaga?
+
+Renzo do Python Pro
+
+Com certeza voc&ecirc; j&aacute; se deparou com uma vaga parecida com essa da imagem.
+
+Uma vaga com sal&aacute;rio compat&iacute;vel com iniciantes, mas que pede conhecimentos compat&iacute;veis com um </pre>'><a href='trabalho/PrecisoSerFullstack.txt'><img src='trabalho/index.html@i=text'/> PrecisoSerFullstack.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.2KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Faculdade: Engenharia de Software, Ci&ecirc;ncia da Computa&ccedil;&atilde;o ou Sistemas de Informa&ccedil;&atilde;o?
+
+https://www.youtube.com/watch?v=APmtMvaYMLg
+
+
+</pre>'><a href='trabalho/Faculdlades.txt'><img src='trabalho/index.html@i=text'/> Faculdlades.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>136B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>## Comentando sobre como aprender
+
+Comecei com o BASIC e o Assembly num micro de 8 bits (sabe o que &eacute; isso)? Pra valer comecei a programar profissionalmente em PCs quando no trabalho precisavam de programador PHP (vers&atilde;o 4), sem internet (quase), s</pre>'><a href='trabalho/AprenderParaSeValorizar.txt'><img src='trabalho/index.html@i=text'/> AprenderParaSeValorizar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.34KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Aviato Creavite atualizou a foto do perfil.
+2 h  &middot;
+35+ Melhores Ideias para  Ganhar Dinheiro💸💸 na Internet📱📲
+Est&aacute; procurando como ganhar dinheiro💸 na internet📲 em busca de mais autonomia ou de gerar uma renda extra para pagar as c</pre>'><a href='trabalho/IdeiasGanharDinheiro.txt'><img src='trabalho/index.html@i=text'/> IdeiasGanharDinheiro.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>5.92KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Igor Marcossi compartilhou um link.
+Moderador
+  &middot; oteon1h3 &agrave;4ofi8ff:d0 ea4 6sa51961962m   &middot;
+Isso &eacute; um manifesto anti faculdade.
+Acabo de ser admitido como Tech Lead na https://corra.com, ganhando 9000U$/m&ecirc;s.
+N&atilde;o, eu n&atilde;o tenho faculdade.
+Recent</pre>'><a href='trabalho/Faculdade.txt'><img src='trabalho/index.html@i=text'/> Faculdade.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.74KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Ideias para projetos em PHP
+
+Famosos:
+Facebook 
+Yahoo! 
+Wikipedia 
+WordPress 
+Joomla
+Tumblr 
+MailChimp 
+Flickr 
+Digg 
+iStockPhoto 
+Baidu
+Laravel 
+Symfony 
+FuelPHP 
+Zend 
+CakePHP
+
+Humhub
+
+CRUDs com bons recursos: pagina&ccedil;&atilde;o, PDO, busca, bootstrap
+
+Ap</pre>'><a href='trabalho/Ideias-projetos.txt'><img src='trabalho/index.html@i=text'/> Ideias-projetos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.58KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Por que investir em tr&aacute;fego pago?
+
+Publicado originalmente por Kazuo Gomi Filho no grupo Joomla Brasil do Facebook
+
+[&ldquo;Por que eu devo investir em tr&aacute;fego pago?&rdquo;]
+1 - 71% da popula&ccedil;&atilde;o est&aacute; na Internet e 66% dos brasileiros est&atilde;o nas redes so</pre>'><a href='trabalho/AnuncioPago.txt'><img src='trabalho/index.html@i=text'/> AnuncioPago.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.45KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Clube dos Programadores
+Wesley Tuck  &middot; 18 min  &middot;
+Percebi ao entrar na minha primeira empresa o quanto &eacute; importante ter agilistas e pessoas pra cuidar da parte comportamental dos Devs. Gra&ccedil;as a Deus a empresa na qual atuo tem uma &oacute;tima gest&atilde;o de</pre>'><a href='trabalho/Pressoes.txt'><img src='trabalho/index.html@i=text'/> Pressoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.36KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Aviato Creavite atualizou a foto do perfil.
+tnrosopdSe 2 0t1u9o2830 0tf1n01j61tiamtcfh as0:0&agrave;he1i4d  &middot;
+15 motivos incr&iacute;veis para voc&ecirc; investir num website para o seu neg&oacute;cio
+Antes de tudo, uma pergunta simples, o que &eacute; um website? Em sua forma </pre>'><a href='trabalho/CriarSiteMotivos.txt'><img src='trabalho/index.html@i=text'/> CriarSiteMotivos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>16.38KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Estudando&#32;com&#32;a&#32;MÃÂÃÂ¡xima&#32;EficiÃÂÃÂªncia.odt'><img src='trabalho/index.html@i=file'/> Estudando com a MÃÂÃÂ¡xima EficiÃÂÃÂªncia.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>24.62KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Rog&eacute;rio L Leite no grupo Clube dos Programadores
+10 h de 16/04/2021
+Boa noite. 
+Assunto: para quem est&aacute; com dificuldades de conseguir emprego e quer tentar outro jeito.
+EDIT: piadas ou memes s&atilde;o interessantes, quanto mais melhor que d&aacute; UP na publ</pre>'><a href='trabalho/Mercado.txt'><img src='trabalho/index.html@i=text'/> Mercado.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.66KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/FicarRico.pdf'><img src='trabalho/index.html@i=file'/> FicarRico.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>59.72KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>## N&Atilde;O cometa esses ERROS quando estiver procurando VAGAS DE PROGRAMA&Ccedil;&Atilde;O
+
+Bom v
+
+https://www.youtube.com/watch?v=2spgNbS9Kig
+</pre>'><a href='trabalho/EviteErrosEmSelecao.txt'><img src='trabalho/index.html@i=text'/> EviteErrosEmSelecao.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>128B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/index.php.html'><img src='trabalho/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.71KB</td>
+                                <td>2024-05-22 07:37:04</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zZW5ob3IxLmpwZw=="/>'><a href='trabalho/senhor1.jpg'><img src='trabalho/index.html@i=image'/> senhor1.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>78.57KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+Dicas de Carreira, Estudo e Tend&ecirc;ncias em Tecnologia - 75 v&iacute;deos do F&aacute;bio da B&oacute;son Treinamentos
+https://www.youtube.com/watch?v=VUNN-uaZgR0&amp;list=PLucm8g_ezqNol23T5hxwxBksoyvX8Ecug
+
+
+</pre>'><a href='trabalho/CarreiraDicas.txt'><img src='trabalho/index.html@i=text'/> CarreiraDicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>187B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/BlogOportunidades.docx'><img src='trabalho/index.html@i=file'/> BlogOportunidades.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>10.92KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/CreativeWebDesignIdeas.pdf'><img src='trabalho/index.html@i=file'/> CreativeWebDesignIdeas.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>683.2KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Produ&ccedil;&atilde;o de Conte&uacute;do com o Peter Jordam
+https://www.youtube.com/watch?v=c-Wg1bTuNpA
+</pre>'><a href='trabalho/ProducaoConteudo.txt'><img src='trabalho/index.html@i=text'/> ProducaoConteudo.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>87B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Matondo Jo&atilde;o compartilhou uma foto.
+Administrador
+  &middot; tnoSd4954fa6t hf4ut3lhc  &middot;
+Ol&aacute;🙋🏻&zwj;♂️, Developers👨🏻&zwj;💻📈👨🏻&zwj;💻🤓
+o WordPress controla mais de 43.3% de todos os sites na #Internet. Sim &ndash; mais de um em quatr</pre>'><a href='trabalho/WordPress.txt'><img src='trabalho/index.html@i=text'/> WordPress.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>13.58KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Quer&#32;ficar&#32;rico.odt'><img src='trabalho/index.html@i=file'/> Quer ficar rico.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>22.44KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Programadores.docx'><img src='trabalho/index.html@i=file'/> Programadores.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>26.84KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>A maior mentira sobre a sua primeira vaga...
+
+Renzo do Python Pro
+
+A Jornada Rumo a Primeira Vaga est&aacute; chegando e eu estou te enviando esta mensagem para te explicar o porqu&ecirc; voc&ecirc; n&atilde;o pode ficar de fora.
+
+Tem um monte de gente que diz que voc&ecirc; t</pre>'><a href='trabalho/MentirPrimeiraVaga.txt'><img src='trabalho/index.html@i=text'/> MentirPrimeiraVaga.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.45KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Aviato Creavite atualizou a foto do perfil.
+tpdnSroeso81 g8c61h4a04thh0amh4htah9l0ag68  &middot;
+Confira 6 melhores sites para ganhar dinheiro💸💸 como freelancer e como funcionam
+Mas voc&ecirc; sabe como iniciar na carreira e come&ccedil;ar a ter os primeiros jo</pre>'><a href='trabalho/IniciarCarreira.txt'><img src='trabalho/index.html@i=text'/> IniciarCarreira.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>5.88KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Quanto&#32;cobrar.odt'><img src='trabalho/index.html@i=file'/> Quanto cobrar.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>152.01KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/VocÃÂÃÂª&#32;deixa&#32;tudo&#32;para&#32;depois.odt'><img src='trabalho/index.html@i=file'/> VocÃÂÃÂª deixa tudo para depois.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>30.71KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Algumas empresas/servi&ccedil;os/softwares/linguagens dominam seu nicho de mercado de forma impressionante e deveriam nos inspirar:
+
+StackOverflow
+Github
+Windows
+Linux
+Ubuntu
+Linux Mint (n)
+Android
+PHP
+MySQL
+LOL
+Laravel
+VSCode
+Dell
+Google
+
+Vemos pessoas be</pre>'><a href='trabalho/Melhores.txt'><img src='trabalho/index.html@i=text'/> Melhores.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>594B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/ProgramacaoMito&#32;ou&#32;verdade.odt'><img src='trabalho/index.html@i=file'/> ProgramacaoMito ou verdade.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>20.82KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/microempresa.odt'><img src='trabalho/index.html@i=file'/> microempresa.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>72.32KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Algumas dicas para ajudar a conseguir o que voc&ecirc; deseja na vida
+
+Voc&ecirc; precisa conseguir ganhar dinheiro obrigatoriamente como est&aacute; fazendo ou pode ser de outra forma?
+
+Voc&ecirc; aguenta questionar o que voc&ecirc; faz para melhorar ou precisa que tudo cont</pre>'><a href='trabalho/SerBemSucedido.txt'><img src='trabalho/index.html@i=text'/> SerBemSucedido.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.68KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Aviato Creavite atualizou a foto do perfil.
+
+8 Formas de ganhar dinheiro💸💸 com programa&ccedil;&atilde;o👨🏻&zwj;💻🤓
+A medida que o mundo se torna mais tecnol&oacute;gico, surge a car&ecirc;ncia por novos profissionais da &aacute;rea👨🏻&zwj;💻, por isso, mostra</pre>'><a href='trabalho/ComoGanharDinheiro.txt'><img src='trabalho/index.html@i=text'/> ComoGanharDinheiro.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>13.19KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/BemSucedido.pdf'><img src='trabalho/index.html@i=file'/> BemSucedido.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>49.73KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Como Conquistar Sua Vaga sem ter Experi&ecirc;ncia
+
+Renzo do Python Pro
+
+Um dos maiores dilemas de todo iniciante que busca conquistar a sua primeira vaga como programador &eacute; saber como conseguir uma vaga sem ter experi&ecirc;ncia.
+
+Pois &eacute;&hellip;
+
+A grande maiori</pre>'><a href='trabalho/EmpregoSemExperiencia.txt'><img src='trabalho/index.html@i=text'/> EmpregoSemExperiencia.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.7KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/site&#32;no&#32;ar&#32;de&#32;graca.docx'><img src='trabalho/index.html@i=file'/> site no ar de graca.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.17KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9qdW5pb3IuanBn"/>'><a href='trabalho/junior.jpg'><img src='trabalho/index.html@i=image'/> junior.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>73.56KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/CarismaVirtual.docx'><img src='trabalho/index.html@i=file'/> CarismaVirtual.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.64KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Guia&#32;-&#32;Maratona&#32;AnÃÂÃÂºncios&#32;On-line&#32;2021.pdf'><img src='trabalho/index.html@i=file'/> Guia - Maratona AnÃÂÃÂºncios On-line 2021.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.33MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Os primeiros passos rumo a sua vaga...
+
+Renzo do Python Pro
+
+Vivemos na era da informa&ccedil;&atilde;o. Se antes, o &uacute;nico meio de acesso ao conhecimento era atrav&eacute;s da faculdade e seus professores, hoje o conhecimento est&aacute; dispon&iacute;vel, gratuitamente, na inte</pre>'><a href='trabalho/PrimeirosPassos.txt'><img src='trabalho/index.html@i=text'/> PrimeirosPassos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.03KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Tiago-gestaotempo.pdf'><img src='trabalho/index.html@i=file'/> Tiago-gestaotempo.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.03MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Voc&ecirc; sabe o que &eacute; um DevPro?
+
+Renzo do Python Pro
+
+Fala Ribamar,
+
+Durante todos estes anos em que atuo no mercado de programa&ccedil;&atilde;o, eu j&aacute; tive contato com muitos programadores. Muitos mesmo. Eu j&aacute; conheci muita gente bacana, desde iniciantes at&eacute;</pre>'><a href='trabalho/VoceEDevPro.txt'><img src='trabalho/index.html@i=text'/> VoceEDevPro.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.38KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Estudando&#32;com&#32;a&#32;MÃÂÃÂ¡xima&#32;EficiÃÂÃÂªncia.pdf'><img src='trabalho/index.html@i=file'/> Estudando com a MÃÂÃÂ¡xima EficiÃÂÃÂªncia.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>106.48KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Kim Flex compartilhou uma publica&ccedil;&atilde;o.Matondo Dev Community
+
+Aviato Creavite
+3 min  &middot;
+15 motivos incr&iacute;veis para voc&ecirc; investir num website para o seu neg&oacute;cio
+Antes de tudo, uma pergunta simples, o que &eacute; um website? Em sua forma simples, um site </pre>'><a href='trabalho/InvestirEmSite.txt'><img src='trabalho/index.html@i=text'/> InvestirEmSite.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>16.36KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Algumas Ideias para projetos em PHP
+
+Famosos criados com PHP:
+
+Facebook 
+Yahoo! 
+Wikipedia 
+WordPress 
+Joomla
+Tumblr 
+MailChimp 
+Flickr 
+Digg 
+iStockPhoto 
+Baidu
+Laravel 
+Zend 
+CakePHP
+Symfony 
+FuelPHP 
+
+CRUDs com bons recursos: pagina&ccedil;&atilde;o, PDO, bus</pre>'><a href='trabalho/IdeiasParaProjetos.txt'><img src='trabalho/index.html@i=text'/> IdeiasParaProjetos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.61KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9wbGFuby5qcGc="/>'><a href='trabalho/plano.jpg'><img src='trabalho/index.html@i=image'/> plano.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>88.09KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Erros que cometi ao longo de minha Carreira em Tecnologia - B&oacute;son Treinamentos
+https://www.youtube.com/watch?v=uSiVS6yEJXI
+
+Escolhas certas que fiz em minha Carreira
+https://www.youtube.com/watch?v=idC8Eod-cH8
+</pre>'><a href='trabalho/ErrosAcertos.txt'><img src='trabalho/index.html@i=text'/> ErrosAcertos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>211B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre></pre>'><a href='trabalho/Workana.txt'><img src='trabalho/index.html@i=text'/> Workana.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>0B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># 🎯 Aprender a lidar com seus investimentos 
+
+N&Atilde;O precisa ser complicado...
+
+Eduardo Moreira &lt;webinarinfo@webinarjam.net&gt;	12 de julho de 2021 08:01
+Responder a: webinarinfo@webinarjam.net
+Para: ⠀ &lt;ribafs@gmail.com&gt;
+
+Aconteceu num fim de semana </pre>'><a href='trabalho/Investimentos.txt'><img src='trabalho/index.html@i=text'/> Investimentos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.5KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>O Segredo Para Ter Um Super C&eacute;rebro
+
+- Exerc&iacute;cios f&iacute;sicos
+- Dormir bem pelo menos 8 horas/noite
+- Caso precise levantar para mijar n&atilde;o acenda a l&acirc;mpada. Se acender atrapalhar&aacute; seu sono.
+- &Oacute;culos de escurid&atilde;o virtual, que filra a luz azul. Use</pre>'><a href='trabalho/SuperCerebro.txt'><img src='trabalho/index.html@i=text'/> SuperCerebro.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>981B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Jean Castro
+Aproveita que t&aacute; ganhando bem agora e faz uma faculdade kkk zoeira
+Faculdade serve para abrir algumas portas para quem est&aacute; come&ccedil;ando e dar o caminho das pedras para algumas coisas.
+O resto vai muito da dedica&ccedil;&atilde;o do cara e esfor&ccedil;o.
+</pre>'><a href='trabalho/Depoimento.txt'><img src='trabalho/index.html@i=text'/> Depoimento.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.95KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/programador-soft&#32;skills.odt'><img src='trabalho/index.html@i=file'/> programador-soft skills.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>550.35KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/3&#32;frases&#32;maÃÂÃÂgicas&#32;para&#32;usar&#32;no&#32;curriÃÂÃÂculo.pdf'><img src='trabalho/index.html@i=file'/> 3 frases maÃÂÃÂgicas para usar no curriÃÂÃÂculo.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>38.72KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/CarreiraDesWeb.odt'><img src='trabalho/index.html@i=file'/> CarreiraDesWeb.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>31.15KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://vanhack.com/ - Canad&aacute;, US e Europa
+https://programathor.com.br/
+
+</pre>'><a href='trabalho/Recrutamento.txt'><img src='trabalho/index.html@i=text'/> Recrutamento.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>74B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Por onde come&ccedil;amos?
+
+Compartilhado pelo colega Alexandre Monetto no grupo Clube de Programadores do Facebook
+
+Boa tarde! 
+
+Como sempre  vemos aqui, temos muitos que desejam entrar na &aacute;rea mas n&atilde;o sabem nem por onde come&ccedil;am e a&iacute; as muitas d&uacute;vi</pre>'><a href='trabalho/PorOndeComecar.txt'><img src='trabalho/index.html@i=text'/> PorOndeComecar.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.16KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/TrabalhoEnquete.odt'><img src='trabalho/index.html@i=file'/> TrabalhoEnquete.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>214.66KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Ta Pipoca
+tronS2l leac4msi20: c&agrave;094hllod8m 10h 80  &middot;
+O pai de Elon Musk possu&iacute;a uma mina de diamantes no regime do apartheid na &Aacute;frica do Sul - DINHEIRO.
+Jeff Bezos come&ccedil;ou a Amazon com 300.000 d&oacute;lares que ele recebeu de seus pais e de seus ami</pre>'><a href='trabalho/Influencias.txt'><img src='trabalho/index.html@i=text'/> Influencias.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.7KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://www.linkedin.com/posts/sara-gomes-892364218_voajuninho-segundadojuninho-segundadojuninho-activity-6904752213202468864-Pp8c/
+</pre>'><a href='trabalho/junior.txt'><img src='trabalho/index.html@i=text'/> junior.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>132B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/UdemyCriarCurso.docx'><img src='trabalho/index.html@i=file'/> UdemyCriarCurso.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>13.57KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>O Linkedln funciona!  Esse t&oacute;pico &eacute; dedicado a dois p&uacute;blicos: Estudantes de programa&ccedil;&atilde;o que querem entrar no mercado, e profissionais que desejam ampliar sua rede no linkedln (sim, estou tamb&eacute;m pedindo para me adicionarem no linkedln, link no f</pre>'><a href='trabalho/Linkedin.txt'><img src='trabalho/index.html@i=text'/> Linkedin.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.82KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Exemplos&#32;de&#32;currÃÂÃÂ­culo.odt'><img src='trabalho/index.html@i=file'/> Exemplos de currÃÂÃÂ­culo.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>27.02KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Tomas Manuel Mavakala Baptista
+18 h  &middot;
+Sobre o Vercionamento e Git  🙂
+.
+.
+Explicarei para que serve, e como muda e impulsiona o fluxo de crescimento no dia &aacute; dia de um programador e todo aquele que trabalha com documentos...
+.
+Meu primeiro conta</pre>'><a href='trabalho/Git.txt'><img src='trabalho/index.html@i=text'/> Git.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.09KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Se&#32;valorize&#32;para&#32;o&#32;mercado.odt'><img src='trabalho/index.html@i=file'/> Se valorize para o mercado.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>565.84KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Dicas e a&ccedil;&otilde;es que podem ajudar a arrumar um trabalho
+
+Fa&ccedil;a uma autoavalia&ccedil;&atilde;o
+
+Se voc&ecirc; tiver perdido seu emprego, o primeiro passo &eacute; dar entrada no seguro-desemprego assim que poss&iacute;vel. Se seu &uacute;ltimo emprego tiver sido em um setor afetado p</pre>'><a href='trabalho/ArrumarUmTrabalho.txt'><img src='trabalho/index.html@i=text'/> ArrumarUmTrabalho.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>8.44KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Sites que ajudam
+
+https://www.tutorialspoint.com/job_search.php
+
+https://programathor.com.br/
+
+https://stackoverflow.com/jobs
+
+https://www.revelo.com.br/
+</pre>'><a href='trabalho/Empregos.txt'><img src='trabalho/index.html@i=text'/> Empregos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>156B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/PerfilMaisProcurado.md'><img src='trabalho/index.html@i=file'/> PerfilMaisProcurado.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>731B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>O problema que te afasta da sua vaga
+Renzo do Python Pro
+
+Fala Ribamar,
+
+Eu atuo no mercado de tecnologia h&aacute; mais de 15 anos. Durante esse tempo, eu j&aacute; exerci diversas fun&ccedil;&otilde;es: j&aacute; fui programador, j&aacute; fui engenheiro de qualidade, j&aacute; fui diretor</pre>'><a href='trabalho/TeAfastadaVaga.txt'><img src='trabalho/index.html@i=text'/> TeAfastadaVaga.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.08KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='trabalho/index.html@Li9Qb3NzaWJpbGlkYWRlcw==.html'><img src='trabalho/index.html@i=folder'/> Possibilidades</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 08:18:06</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>https://www.youtube.com/watch?v=0jQEFgWWjTQ
+
+
+</pre>'><a href='trabalho/RendaExtra.txt'><img src='trabalho/index.html@i=text'/> RendaExtra.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>46B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+
+https://www.youtube.com/watch?v=HNJ7BLfiy-E&amp;list=PLQyXp_XS25LTr2UpQqDFLpAe2sFMYWPLg
+
+https://www.youtube.com/watch?v=x91orrchTBQ&amp;list=PLQyXp_XS25LSfB6WRe8FC-0Xc0kopbdFN
+
+https://www.youtube.com/watch?v=c_hqdwKnY3s
+
+https://www.youtube.com/watch?v=h</pre>'><a href='trabalho/Curriculo.txt'><img src='trabalho/index.html@i=text'/> Curriculo.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>488B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/IdeiasParaAplicativos.pdf'><img src='trabalho/index.html@i=file'/> IdeiasParaAplicativos.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>154.75KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>O computador ideal para programar
+
+Renzo do Python Pro
+
+Sempre que eu pergunto aos meus alunos e seguidores qual o motivo que os impede de conquistar sua primeira vaga como programador, uma resposta comum &eacute; a falta de um bom computador para estudar.</pre>'><a href='trabalho/ComputadorIdeal.txt'><img src='trabalho/index.html@i=text'/> ComputadorIdeal.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.95KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/Produtividade.md'><img src='trabalho/index.html@i=file'/> Produtividade.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.05KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>COMO MONTAR CURR&Iacute;CULO SEM EXPERI&Ecirc;NCIA PARA PRIMEIRO EMPREGO/EST&Aacute;GIO | @relstudy
+
+https://www.youtube.com/watch?v=cMvkRWQC-go
+
+</pre>'><a href='trabalho/CriarCurriculo.txt'><img src='trabalho/index.html@i=text'/> CriarCurriculo.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>129B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Sites com ofertas de emprego/trabalho
+
+https://candidatos.abler.com.br/vagas
+https://br.indeed.com/
+
+https://www.linkedin.com
+
+
+Em ingl&ecirc;s
+
+https://vanhack.com/
+
+</pre>'><a href='trabalho/OfertasTrabalho.txt'><img src='trabalho/index.html@i=text'/> OfertasTrabalho.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>162B</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Juninho Garcia
+
+👨&zwj;💻 Se voc&ecirc; &eacute; Programador com CNPJ cuidado! Pode estar Pagando Imposto Errado no Simples Nacional 💸💸💸
+E vou te provar isso...
+Meu nome &eacute; Junior Garcia e sou Contador Especialista em Tributa&ccedil;&atilde;o na Garcia Contabili</pre>'><a href='trabalho/PJ.txt'><img src='trabalho/index.html@i=text'/> PJ.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.06KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/GUIA&#32;-&#32;IMERSÃÂÃÂO&#32;DOS&#32;GESTORES&#32;DE&#32;TRÃÂÃÂFEGO&#32;E&#32;CONVERSÃÂÃÂO.pdf'><img src='trabalho/index.html@i=file'/> GUIA - IMERSÃÂÃÂO DOS GESTORES DE TRÃÂÃÂFEGO E CONVERSÃÂÃÂO.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.93MB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>CLTePJ
+
+No dia 26/04/2021 eu fiz a seguinte pergunta aos coelgas do grupo PHP Brasil no Facebook:
+
+D&uacute;vidas sobre o MEI 
+O programador n&atilde;o pode ter MEI mas o digitador pode. Perdi uma excelente oportunidade na semana passada por que n&atilde;o tenho PJ. P</pre>'><a href='trabalho/CLTePJ.txt'><img src='trabalho/index.html@i=text'/> CLTePJ.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>12.82KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trabalho/PrepareSe.docx'><img src='trabalho/index.html@i=file'/> PrepareSe.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.93KB</td>
+                                <td>2024-02-03 11:21:20</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,486 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='servidores/Seguranca/index.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/php_seguranca.html'><img src='servidores/Seguranca/PHP/index.html@i=file'/> php_seguranca</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.22KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Refor&ccedil;ar a seguran&ccedil;a do PHP
+
+Uma boa forma de melhorar a seguran&ccedil;a do php &eacute; instalando o phpsecinfo:
+https://github.com/funkatron/phpsecinfo 
+http://phpsec.org/projects/phpsecinfo/
+
+E corrigir os erros apontados por ele com as respectivas recomen</pre>'><a href='servidores/Seguranca/PHP/php.txt'><img src='servidores/Seguranca/PHP/index.html@i=text'/> php.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>12.91KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/Email&#32;Address&#32;Validation.html'><img src='servidores/Seguranca/PHP/index.html@i=file'/> Email Address Validation</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.55KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/senha.html'><img src='servidores/Seguranca/PHP/index.html@i=file'/> senha</a></td>
+                                                
+                                <td>File</td>
+                                <td>114B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Usando password_verify()
+
+## Antes de inserir no banco
+
+$hash = password_hash($password, PASSWORD_DEFAULT);
+
+				$insert_stmt=$db-&gt;prepare(&quot;INSERT INTO users(username,email,password,role,enabled) VALUES(:uname,:uemail,:upassword,:urole,:uenabled)&quot;)</pre>'><a href='servidores/Seguranca/PHP/usando_password_verify.txt'><img src='servidores/Seguranca/PHP/index.html@i=text'/> usando_password_verify.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>791B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/SenhaComplexa.md'><img src='servidores/Seguranca/PHP/index.html@i=file'/> SenhaComplexa.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.5KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/phpini.html'><img src='servidores/Seguranca/PHP/index.html@i=file'/> phpini</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.17KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/PHP&#32;Security.pdf'><img src='servidores/Seguranca/PHP/index.html@i=file'/> PHP Security.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>76.95KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/index.php.html'><img src='servidores/Seguranca/PHP/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Refor&ccedil;ando a Seguran&ccedil;a do PHP
+
+Filtrando dados com PHP
+https://phpro.org/tutorials/Filtering-Data-with-PHP.html
+
+Seguran&ccedil;a no PHP
+https://www.phpro.org/tutorials/PHP-Security.html
+
+Top 7 PHP Security Blunders
+https://www.sitepoint.com/php-security</pre>'><a href='servidores/Seguranca/PHP/php0.txt'><img src='servidores/Seguranca/PHP/index.html@i=text'/> php0.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>898B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/phpsec.html'><img src='servidores/Seguranca/PHP/index.html@i=file'/> phpsec</a></td>
+                                                
+                                <td>File</td>
+                                <td>409B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/Filtros&#32;em&#32;PHP.html'><img src='servidores/Seguranca/PHP/index.html@i=file'/> Filtros em PHP</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.19KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/PHP&#32;Security&#32;Cheat&#32;Sheet&#32;-&#32;OWASP.pdf'><img src='servidores/Seguranca/PHP/index.html@i=file'/> PHP Security Cheat Sheet - OWASP.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>156.46KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/PHP&#32;Security&#32;Cheat&#32;Sheet&#32;-&#32;OWASP.odt'><img src='servidores/Seguranca/PHP/index.html@i=file'/> PHP Security Cheat Sheet - OWASP.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>37.64KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/PHP&#32;Security.odt'><img src='servidores/Seguranca/PHP/index.html@i=file'/> PHP Security.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>21.94KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/index.html@Li9GaWx0cm9z.html'><img src='servidores/Seguranca/PHP/index.html@i=folder'/> Filtros</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/php.ini-production.html'><img src='servidores/Seguranca/PHP/index.html@i=file'/> php.ini-production</a></td>
+                                                
+                                <td>File</td>
+                                <td>71.01KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/1seguranca.html'><img src='servidores/Seguranca/PHP/index.html@i=file'/> 1seguranca</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.91KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/php.html'><img src='servidores/Seguranca/PHP/index.html@i=file'/> php</a></td>
+                                                
+                                <td>File</td>
+                                <td>683B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/index.html@Li9mb3JtdWxhcmlvc19wdDE=.html'><img src='servidores/Seguranca/PHP/index.html@i=folder'/> formularios_pt1</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='servidores/Seguranca/PHP/index.html@Li9SZWdFeA==.html'><img src='servidores/Seguranca/PHP/index.html@i=folder'/> RegEx</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

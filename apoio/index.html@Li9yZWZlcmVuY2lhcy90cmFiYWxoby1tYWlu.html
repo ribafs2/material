@@ -1,0 +1,1718 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+        
+<style>
+a:link {
+  color: red;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: green;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: black;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+a:active {
+  color: yellow;
+  background-color: transparent;
+  text-decoration: underline;
+}
+</style>         
+	</head>
+    <body style="font-size: 15px;">
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='index.html@Li9yZWZlcmVuY2lhcw==.html'>Index of /material/apoio/referencias/trabalho-main/</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Mentiraprimeira&#32;vaga.html'><img src='index.html@i=file'/> Mentiraprimeira vaga</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.45KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Facukdade.html'><img src='index.html@i=file'/> Facukdade</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.74KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/SucessoLairRibeiro.html'><img src='index.html@i=file'/> SucessoLairRibeiro</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.64KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Eles&#32;querem&#32;acabar&#32;com&#32;a&#32;sua&#32;carreira.odt'><img src='index.html@i=file'/> Eles querem acabar com a sua carreira.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>20.35KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Dormir&#32;Bem&#32;Restaura&#32;e&#32;Revigora.pdf'><img src='index.html@i=file'/> Dormir Bem Restaura e Revigora.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>38.39KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Empregos.html'><img src='index.html@i=file'/> Empregos</a></td>
+                                                
+                                <td>File</td>
+                                <td>156B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/GitHub&#32;emprego.odt'><img src='index.html@i=file'/> GitHub emprego.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>21.21KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/InfosTrabalho.html'><img src='index.html@i=file'/> InfosTrabalho</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.63KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Valorizacao.html'><img src='index.html@i=file'/> Valorizacao</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.29KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Site.html'><img src='index.html@i=file'/> Site</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.37KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Participacao.html'><img src='index.html@i=file'/> Participacao</a></td>
+                                                
+                                <td>File</td>
+                                <td>80B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Emprego.html'><img src='index.html@i=file'/> Emprego</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.23KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Pressoes.html'><img src='index.html@i=file'/> Pressoes</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.36KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/ValorConhecimento.md'><img src='index.html@i=file'/> ValorConhecimento.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.11KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/EviteErrosEmSelecao.md'><img src='index.html@i=file'/> EviteErrosEmSelecao.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>128B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/CriarVideos.docx'><img src='index.html@i=file'/> CriarVideos.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.81KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/PedidoTrabalho.html'><img src='index.html@i=file'/> PedidoTrabalho</a></td>
+                                                
+                                <td>File</td>
+                                <td>384B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZWZlcmVuY2lhcy90cmFiYWxoby1tYWluL3lvdXJfbGlmZS5wbmc="/>'><a href='referencias/trabalho-main/your_life.png'><img src='index.html@i=image'/> your_life.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>187.25KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/WordPress.html'><img src='index.html@i=file'/> WordPress</a></td>
+                                                
+                                <td>File</td>
+                                <td>13.58KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Linkedin.html'><img src='index.html@i=file'/> Linkedin</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.82KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Entendendo&#32;a&#32;Sefaz.odt'><img src='index.html@i=file'/> Entendendo a Sefaz.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>26.37KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Curriculo2.html'><img src='index.html@i=file'/> Curriculo2</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.54KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Estímulo&#32;para&#32;estudar.pdf'><img src='index.html@i=file'/> Estímulo para estudar.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>39.14KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/EmpregoSemExperiencia.html'><img src='index.html@i=file'/> EmpregoSemExperiencia</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.7KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/TrabalhoProg.docx'><img src='index.html@i=file'/> TrabalhoProg.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>639.64KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/LICENSE.html'><img src='index.html@i=file'/> LICENSE</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.04KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/3&#32;frases&#32;mágicas&#32;para&#32;usar&#32;no&#32;currículo.pdf'><img src='index.html@i=file'/> 3 frases mágicas para usar no currículo.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>38.72KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/SkillstoSuccessful&#32;Freelancer.odt'><img src='index.html@i=file'/> SkillstoSuccessful Freelancer.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>146.2KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/ComoGanharDinheiro.html'><img src='index.html@i=file'/> ComoGanharDinheiro</a></td>
+                                                
+                                <td>File</td>
+                                <td>13.19KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/AbrangenciaProg.html'><img src='index.html@i=file'/> AbrangenciaProg</a></td>
+                                                
+                                <td>File</td>
+                                <td>739B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/TIAbundante.html'><img src='index.html@i=file'/> TIAbundante</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.19KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Produtividade.html'><img src='index.html@i=file'/> Produtividade</a></td>
+                                                
+                                <td>File</td>
+                                <td>101B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/RecomendacoesCodigo.md'><img src='index.html@i=file'/> RecomendacoesCodigo.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.81KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/DevelopersGuideInterviews.pdf'><img src='index.html@i=file'/> DevelopersGuideInterviews.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.77MB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZWZlcmVuY2lhcy90cmFiYWxoby1tYWluL2FycnVtYXItam9iLmpwZw=="/>'><a href='referencias/trabalho-main/arrumar-job.jpg'><img src='index.html@i=image'/> arrumar-job.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>56.59KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Desenvolvedor&#32;fullstack.odt'><img src='index.html@i=file'/> Desenvolvedor fullstack.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>44.28KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/SePrepararMercado.html'><img src='index.html@i=file'/> SePrepararMercado</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.06KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/UdemyChecklist.pdf'><img src='index.html@i=file'/> UdemyChecklist.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>979.97KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/SabeFalarIngles.html'><img src='index.html@i=file'/> SabeFalarIngles</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.66KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/entrevista&#32;de&#32;emprego.odt'><img src='index.html@i=file'/> entrevista de emprego.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>94.37KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/carreira&#32;de&#32;sucesso.odt'><img src='index.html@i=file'/> carreira de sucesso.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>33.22KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='index.html@Li9yZWZlcmVuY2lhcy90cmFiYWxoby1tYWluL01vZGVsb3M=.html'><img src='index.html@i=folder'/> Modelos</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-06-08 12:38:58</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Disposicao.html'><img src='index.html@i=file'/> Disposicao</a></td>
+                                                
+                                <td>File</td>
+                                <td>339B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZWZlcmVuY2lhcy90cmFiYWxoby1tYWluL0lMb3ZlUHJvZ3JhbW1pbmcuanBn"/>'><a href='referencias/trabalho-main/ILoveProgramming.jpg'><img src='index.html@i=image'/> ILoveProgramming.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>60.35KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZWZlcmVuY2lhcy90cmFiYWxoby1tYWluL0FwcmVuZGVyLmpwZw=="/>'><a href='referencias/trabalho-main/Aprender.jpg'><img src='index.html@i=image'/> Aprender.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>39.5KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/OpcoesTrabalho.html'><img src='index.html@i=file'/> OpcoesTrabalho</a></td>
+                                                
+                                <td>File</td>
+                                <td>116B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/RendaExtra.html'><img src='index.html@i=file'/> RendaExtra</a></td>
+                                                
+                                <td>File</td>
+                                <td>46B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Guia_Pratico_para_a_Independencia_Financeira-fb.pdf'><img src='index.html@i=file'/> Guia_Pratico_para_a_Independencia_Financeira-fb.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.89MB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/TeAfastadaVaga.html'><img src='index.html@i=file'/> TeAfastadaVaga</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.08KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Performance.html'><img src='index.html@i=file'/> Performance</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.18KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Investimentos.md'><img src='index.html@i=file'/> Investimentos.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.5KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Estudando&#32;com&#32;a&#32;Máxima&#32;Eficiência.pdf'><img src='index.html@i=file'/> Estudando com a Máxima Eficiência.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>106.48KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Trybe.html'><img src='index.html@i=file'/> Trybe</a></td>
+                                                
+                                <td>File</td>
+                                <td>0B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/ConseguirEmprego.pdf'><img src='index.html@i=file'/> ConseguirEmprego.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>75.75KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Como&#32;emitir&#32;nota&#32;fiscal-pessoafisica.odt'><img src='index.html@i=file'/> Como emitir nota fiscal-pessoafisica.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>917.88KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZWZlcmVuY2lhcy90cmFiYWxoby1tYWluL3Nlbmlvci5qcGc="/>'><a href='referencias/trabalho-main/senior.jpg'><img src='index.html@i=image'/> senior.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>78.05KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Ecommerce.html'><img src='index.html@i=file'/> Ecommerce</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.59KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Recrutamento.html'><img src='index.html@i=file'/> Recrutamento</a></td>
+                                                
+                                <td>File</td>
+                                <td>74B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Como&#32;criar&#32;um&#32;Curso&#32;Online.docx'><img src='index.html@i=file'/> Como criar um Curso Online.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>15.56KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/ErrosAcertos.html'><img src='index.html@i=file'/> ErrosAcertos</a></td>
+                                                
+                                <td>File</td>
+                                <td>211B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/CarreiraDicas.html'><img src='index.html@i=file'/> CarreiraDicas</a></td>
+                                                
+                                <td>File</td>
+                                <td>187B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Exemplos&#32;de&#32;currículo.odt'><img src='index.html@i=file'/> Exemplos de currículo.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>27.02KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/MaquinaPerfeita.html'><img src='index.html@i=file'/> MaquinaPerfeita</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.14KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/README.md'><img src='index.html@i=file'/> README.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>853B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/OfertasTrabalho.html'><img src='index.html@i=file'/> OfertasTrabalho</a></td>
+                                                
+                                <td>File</td>
+                                <td>162B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/contribuir&#32;com&#32;Open&#32;Source.docx'><img src='index.html@i=file'/> contribuir com Open Source.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>19.71KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Freelancer.md'><img src='index.html@i=file'/> Freelancer.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.17KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/primeira&#32;entrevista&#32;de&#32;emprego.odt'><img src='index.html@i=file'/> primeira entrevista de emprego.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>94.81KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/FrasesMotivacionais.pdf'><img src='index.html@i=file'/> FrasesMotivacionais.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>101.16KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/CursosGratuitos.md'><img src='index.html@i=file'/> CursosGratuitos.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>814B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Estagio.html'><img src='index.html@i=file'/> Estagio</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.35KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/ser&#32;um&#32;programador&#32;melhor.docx'><img src='index.html@i=file'/> ser um programador melhor.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>11.29KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Guia&#32;-&#32;Maratona&#32;Anúncios&#32;On-line&#32;2021.pdf'><img src='index.html@i=file'/> Guia - Maratona Anúncios On-line 2021.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.33MB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZWZlcmVuY2lhcy90cmFiYWxoby1tYWluL25pdmVpcy5qcGc="/>'><a href='referencias/trabalho-main/niveis.jpg'><img src='index.html@i=image'/> niveis.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>51.58KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Entrevista.html'><img src='index.html@i=file'/> Entrevista</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.43KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/CriarCurriculo.md'><img src='index.html@i=file'/> CriarCurriculo.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>129B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/AprenderParaSeValorizar.md'><img src='index.html@i=file'/> AprenderParaSeValorizar.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.34KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Criador&#32;de&#32;Conteúdo.odt'><img src='index.html@i=file'/> Criador de Conteúdo.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>341.57KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Empregos.md'><img src='index.html@i=file'/> Empregos.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>156B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Por que investir em tr&aacute;fego pago?
+
+Publicado originalmente por Kazuo Gomi Filho no grupo Joomla Brasil do Facebook
+
+[&ldquo;Por que eu devo investir em tr&aacute;fego pago?&rdquo;]
+1 - 71% da popula&ccedil;&atilde;o est&aacute; na Internet e 66% dos brasileiros est&atilde;o nas redes so</pre>'><a href='referencias/trabalho-main/AnuncioPago.txt'><img src='index.html@i=text'/> AnuncioPago.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.45KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Ideias-projetos.html'><img src='index.html@i=file'/> Ideias-projetos</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.58KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/ComputadorIdeal.html'><img src='index.html@i=file'/> ComputadorIdeal</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.95KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/PorqueContratalo.html'><img src='index.html@i=file'/> PorqueContratalo</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.25KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Faculdlades.html'><img src='index.html@i=file'/> Faculdlades</a></td>
+                                                
+                                <td>File</td>
+                                <td>136B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/CapacidadeEntrega.html'><img src='index.html@i=file'/> CapacidadeEntrega</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.25KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Os&#32;primeiros&#32;passos.html'><img src='index.html@i=file'/> Os primeiros passos</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.03KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/FicarRico.pdf'><img src='index.html@i=file'/> FicarRico.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>59.72KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZWZlcmVuY2lhcy90cmFiYWxoby1tYWluL3NlbmhvcjEuanBn"/>'><a href='referencias/trabalho-main/senhor1.jpg'><img src='index.html@i=image'/> senhor1.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>78.57KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Estudando&#32;com&#32;a&#32;Máxima&#32;Eficiência.odt'><img src='index.html@i=file'/> Estudando com a Máxima Eficiência.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>24.62KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/BlogOportunidades.docx'><img src='index.html@i=file'/> BlogOportunidades.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>10.92KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Você&#32;deixa&#32;tudo&#32;para&#32;depois.odt'><img src='index.html@i=file'/> Você deixa tudo para depois.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>30.71KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/full-stack.html'><img src='index.html@i=file'/> full-stack</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.71KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Git.html'><img src='index.html@i=file'/> Git</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.09KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/CreativeWebDesignIdeas.pdf'><img src='index.html@i=file'/> CreativeWebDesignIdeas.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>683.2KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Ingles.html'><img src='index.html@i=file'/> Ingles</a></td>
+                                                
+                                <td>File</td>
+                                <td>124B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/CriarSiteMotivos.html'><img src='index.html@i=file'/> CriarSiteMotivos</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.38KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Melhores.html'><img src='index.html@i=file'/> Melhores</a></td>
+                                                
+                                <td>File</td>
+                                <td>594B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Quer&#32;ficar&#32;rico.odt'><img src='index.html@i=file'/> Quer ficar rico.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>22.44KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Programadores.docx'><img src='index.html@i=file'/> Programadores.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>26.84KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Quanto&#32;cobrar.odt'><img src='index.html@i=file'/> Quanto cobrar.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>152.01KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/ProgramacaoMito&#32;ou&#32;verdade.odt'><img src='index.html@i=file'/> ProgramacaoMito ou verdade.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>20.82KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/microempresa.odt'><img src='index.html@i=file'/> microempresa.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>72.32KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/QuantoCobrar.html'><img src='index.html@i=file'/> QuantoCobrar</a></td>
+                                                
+                                <td>File</td>
+                                <td>138B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/GUIA&#32;-&#32;IMERSÃO&#32;DOS&#32;GESTORES&#32;DE&#32;TRÁFEGO&#32;E&#32;CONVERSÃO.pdf'><img src='index.html@i=file'/> GUIA - IMERSÃO DOS GESTORES DE TRÁFEGO E CONVERSÃO.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.93MB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Algumas dicas para ajudar a conseguir o que voc&ecirc; deseja na vida
+
+Voc&ecirc; precisa conseguir ganhar dinheiro obrigatoriamente como est&aacute; fazendo ou pode ser de outra forma?
+
+Voc&ecirc; aguenta questionar o que voc&ecirc; faz para melhorar ou precisa que tudo cont</pre>'><a href='referencias/trabalho-main/SerBemSucedido.txt'><img src='index.html@i=text'/> SerBemSucedido.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.68KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/1Distracoes.html'><img src='index.html@i=file'/> 1Distracoes</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.75KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/PrecisoSerFullstack.html'><img src='index.html@i=file'/> PrecisoSerFullstack</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.2KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/TrabalhoRemoto.md'><img src='index.html@i=file'/> TrabalhoRemoto.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>13.02KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/BemSucedido.pdf'><img src='index.html@i=file'/> BemSucedido.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>49.73KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/GestaoVendaExcel.html'><img src='index.html@i=file'/> GestaoVendaExcel</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.46KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/ProducaoConteudo.html'><img src='index.html@i=file'/> ProducaoConteudo</a></td>
+                                                
+                                <td>File</td>
+                                <td>87B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/site&#32;no&#32;ar&#32;de&#32;graca.docx'><img src='index.html@i=file'/> site no ar de graca.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.17KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Workana.html'><img src='index.html@i=file'/> Workana</a></td>
+                                                
+                                <td>File</td>
+                                <td>0B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZWZlcmVuY2lhcy90cmFiYWxoby1tYWluL2p1bmlvci5qcGc="/>'><a href='referencias/trabalho-main/junior.jpg'><img src='index.html@i=image'/> junior.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>73.56KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/SuperCerebro.html'><img src='index.html@i=file'/> SuperCerebro</a></td>
+                                                
+                                <td>File</td>
+                                <td>981B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/IdeiasGanharDinheiro.html'><img src='index.html@i=file'/> IdeiasGanharDinheiro</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.92KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/CarismaVirtual.docx'><img src='index.html@i=file'/> CarismaVirtual.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.64KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/junior.html'><img src='index.html@i=file'/> junior</a></td>
+                                                
+                                <td>File</td>
+                                <td>132B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Tiago-gestaotempo.pdf'><img src='index.html@i=file'/> Tiago-gestaotempo.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.03MB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/EmpregoNovo.html'><img src='index.html@i=file'/> EmpregoNovo</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.25KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/ArrumarUmTrabalho.md'><img src='index.html@i=file'/> ArrumarUmTrabalho.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.44KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Referencias.html'><img src='index.html@i=file'/> Referencias</a></td>
+                                                
+                                <td>File</td>
+                                <td>547B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/IniciarCarreira.html'><img src='index.html@i=file'/> IniciarCarreira</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.88KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Recomendacoes.html'><img src='index.html@i=file'/> Recomendacoes</a></td>
+                                                
+                                <td>File</td>
+                                <td>292B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/InvestirEmSite.html'><img src='index.html@i=file'/> InvestirEmSite</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.36KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Algumas Ideias para projetos em PHP
+
+Famosos criados com PHP:
+
+Facebook 
+Yahoo! 
+Wikipedia 
+WordPress 
+Joomla
+Tumblr 
+MailChimp 
+Flickr 
+Digg 
+iStockPhoto 
+Baidu
+Laravel 
+Zend 
+CakePHP
+Symfony 
+FuelPHP 
+
+CRUDs com bons recursos: pagina&ccedil;&atilde;o, PDO, bus</pre>'><a href='referencias/trabalho-main/IdeiasParaProjetos.txt'><img src='index.html@i=text'/> IdeiasParaProjetos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.61KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZWZlcmVuY2lhcy90cmFiYWxoby1tYWluL3BsYW5vLmpwZw=="/>'><a href='referencias/trabalho-main/plano.jpg'><img src='index.html@i=image'/> plano.jpg</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>88.09KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Logica.html'><img src='index.html@i=file'/> Logica</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.52KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Recomendacoes2.html'><img src='index.html@i=file'/> Recomendacoes2</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.54KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/programador-soft&#32;skills.odt'><img src='index.html@i=file'/> programador-soft skills.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>550.35KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/PorOndeComecar.md'><img src='index.html@i=file'/> PorOndeComecar.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.16KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/CarreiraDesWeb.odt'><img src='index.html@i=file'/> CarreiraDesWeb.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>31.15KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Skils.html'><img src='index.html@i=file'/> Skils</a></td>
+                                                
+                                <td>File</td>
+                                <td>240B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/TrabalhoEnquete.odt'><img src='index.html@i=file'/> TrabalhoEnquete.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>214.66KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/DEpoimento.html'><img src='index.html@i=file'/> DEpoimento</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.95KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Curriculo.html'><img src='index.html@i=file'/> Curriculo</a></td>
+                                                
+                                <td>File</td>
+                                <td>488B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/UdemyCriarCurso.docx'><img src='index.html@i=file'/> UdemyCriarCurso.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>13.57KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Trabalhando&#32;com&#32;a&#32;Máxima&#32;Eficiência.odt'><img src='index.html@i=file'/> Trabalhando com a Máxima Eficiência.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>25.17KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/DesenvolvedordoZero.html'><img src='index.html@i=file'/> DesenvolvedordoZero</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.95KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/VoceEDevPro.html'><img src='index.html@i=file'/> VoceEDevPro</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.38KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/PrimeiroEmprego.html'><img src='index.html@i=file'/> PrimeiroEmprego</a></td>
+                                                
+                                <td>File</td>
+                                <td>283B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Se&#32;valorize&#32;para&#32;o&#32;mercado.odt'><img src='index.html@i=file'/> Se valorize para o mercado.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>565.84KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/CLTePJ.html'><img src='index.html@i=file'/> CLTePJ</a></td>
+                                                
+                                <td>File</td>
+                                <td>12.82KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/PerfilMaisProcurado.md'><img src='index.html@i=file'/> PerfilMaisProcurado.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>731B</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='index.html@Li9yZWZlcmVuY2lhcy90cmFiYWxoby1tYWluL1Bvc3NpYmlsaWRhZGVz.html'><img src='index.html@i=folder'/> Possibilidades</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-06-08 12:38:59</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/IdeiasParaAplicativos.pdf'><img src='index.html@i=file'/> IdeiasParaAplicativos.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>154.75KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/TemTempoparaEstudar.html'><img src='index.html@i=file'/> TemTempoparaEstudar</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.22KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Produtividade.md'><img src='index.html@i=file'/> Produtividade.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.05KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Mercado.html'><img src='index.html@i=file'/> Mercado</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.66KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Influencias.html'><img src='index.html@i=file'/> Influencias</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.7KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/PJ.html'><img src='index.html@i=file'/> PJ</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.06KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/Vagas.md'><img src='index.html@i=file'/> Vagas.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.29KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/RecomendacoesEstudo.md'><img src='index.html@i=file'/> RecomendacoesEstudo.md</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.27KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='referencias/trabalho-main/PrepareSe.docx'><img src='index.html@i=file'/> PrepareSe.docx</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.93KB</td>
+                                <td>2022-08-23 09:50:40</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>
