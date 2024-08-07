@@ -1,0 +1,32 @@
+- assets.zip - mais de 14 mil assets: imagens, áudio, etc
+- bulk-images-resize.zip - redimensionar imagens
+- calculadora.zip - Calculadora em JS com neomorphic
+- Calendario2024.odt - Anual para data e fotos
+- cep.zip - Digite o CEP e retorna o endereço
+- ckeditor-php-pdo-insert.zip
+- Composer.md - Dicas sobre
+- cpfcnpj.zip - Valudação
+- cronometro.zip - Em JS
+- Datatables.zip - com PHP
+- despertador.zip - JS
+- digitacao.zip - Teste em JS
+- download.zip - PHP
+- Extenso.zip - PHP
+- faker-br.zip - Criação de SQL
+- grid-editable.zip - PHP
+- juros-compostos.zip - JS
+- ListaDirBS.zip - Listagem de pastas/arquivos
+- MkDocs.zip - Criador de sites para documentação
+- PDFEditavel.zip - PHP
+- questionario.zip - JS
+- reflexo.html - JS
+- Relatorios.zip - PHP
+- relogio.zip- JS
+- renlote.zip - Shellscript
+- Sort-columns.zip - PHP
+- Tools.txt - Algumas boas ferramentas
+- Upload.zip - PHP
+- video-gallery-bs.zip - JS com BS
+- VSCode.zip - dicas
+- Wget.zip - Dicas sobre
+- xadrez.zip - Jogo em JS
