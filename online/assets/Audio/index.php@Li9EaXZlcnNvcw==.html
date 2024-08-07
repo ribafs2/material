@@ -1,0 +1,1950 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li9BdWRpbw==.html'>Família Ferreira de Sousa</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Upgrade.wav'><img src='Diversos/index.html@i=audio'/> Upgrade.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>49.92KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/axe_impact.wav'><img src='Diversos/index.html@i=audio'/> axe_impact.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>262.26KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Intergalactic&#32;Odyssey.ogg'><img src='Diversos/index.html@i=audio'/> Intergalactic Odyssey.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>1.4MB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/impactMetal_003.ogg'><img src='Diversos/index.html@i=audio'/> impactMetal_003.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>16.9KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/hurt.ogg'><img src='Diversos/index.html@i=audio'/> hurt.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>7.03KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/rollover3.ogg'><img src='Diversos/index.html@i=audio'/> rollover3.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.67KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/dead.wav'><img src='Diversos/index.html@i=audio'/> dead.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>26.46KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/walk.mp3'><img src='Diversos/index.html@i=audio'/> walk.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>147.01KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/cloud.ogg'><img src='Diversos/index.html@i=audio'/> cloud.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>12.14KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/go.ogg'><img src='Diversos/index.html@i=audio'/> go.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>10.62KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/right.ogg'><img src='Diversos/index.html@i=audio'/> right.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.2KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/click2.ogg'><img src='Diversos/index.html@i=audio'/> click2.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.55KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Gb3.mp3'><img src='Diversos/index.html@i=audio'/> Gb3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/loseitem.ogg'><img src='Diversos/index.html@i=audio'/> loseitem.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>8.82KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/bandeira.wav'><img src='Diversos/index.html@i=audio'/> bandeira.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>24.04KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/star.ogg'><img src='Diversos/index.html@i=audio'/> star.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>10.05KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/click.ogg'><img src='Diversos/index.html@i=audio'/> click.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.77KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/applause.wav'><img src='Diversos/index.html@i=audio'/> applause.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>2.22MB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zb3VuZGljb25zLnBuZw=="/>'><a href='Diversos/soundicons.png'><img src='Diversos/index.html@i=image'/> soundicons.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.73KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/enemy-fire.wav'><img src='Diversos/index.html@i=audio'/> enemy-fire.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>9.82KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/wrong.mp3'><img src='Diversos/index.html@i=audio'/> wrong.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.3KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/move.mp3'><img src='Diversos/index.html@i=audio'/> move.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>7.64KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/ResetTimer.wav'><img src='Diversos/index.html@i=audio'/> ResetTimer.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>49.14KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/bandeira1.wav'><img src='Diversos/index.html@i=audio'/> bandeira1.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>287.73KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/victory.m4a'><img src='Diversos/index.html@i=file'/> victory.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>34.69KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/rollover4.ogg'><img src='Diversos/index.html@i=audio'/> rollover4.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.07KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Jingle_Lose_00.mp3'><img src='Diversos/index.html@i=audio'/> Jingle_Lose_00.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>88.32KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Healing.wav'><img src='Diversos/index.html@i=audio'/> Healing.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>39.95KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/open_001.ogg'><img src='Diversos/index.html@i=audio'/> open_001.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>9.6KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/hit-snowman.ogg'><img src='Diversos/index.html@i=audio'/> hit-snowman.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>9.31KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/click3.ogg'><img src='Diversos/index.html@i=audio'/> click3.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.77KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/E3.mp3'><img src='Diversos/index.html@i=audio'/> E3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/countdown.ogg'><img src='Diversos/index.html@i=audio'/> countdown.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>43.1KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/throw.mp3'><img src='Diversos/index.html@i=audio'/> throw.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.68KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/lowRandom.ogg'><img src='Diversos/index.html@i=audio'/> lowRandom.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.29KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/score.wav'><img src='Diversos/index.html@i=audio'/> score.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>17.12KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jb2luLnBuZw=="/>'><a href='Diversos/coin.png'><img src='Diversos/index.html@i=image'/> coin.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>39.03KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/jump.mp3'><img src='Diversos/index.html@i=audio'/> jump.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>7.13KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/PlayerAttack.wav'><img src='Diversos/index.html@i=audio'/> PlayerAttack.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.02KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/fail.m4a'><img src='Diversos/index.html@i=file'/> fail.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>31.5KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/olamundo.wav'><img src='Diversos/index.html@i=audio'/> olamundo.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>206.04KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/bonus.wav'><img src='Diversos/index.html@i=audio'/> bonus.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.28KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Pickup_00.mp3'><img src='Diversos/index.html@i=audio'/> Pickup_00.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>6.77KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/tap2.wav'><img src='Diversos/index.html@i=audio'/> tap2.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>9.95KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/getitem.ogg'><img src='Diversos/index.html@i=audio'/> getitem.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.29KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Collect_Point_01.mp3'><img src='Diversos/index.html@i=audio'/> Collect_Point_01.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>12.28KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/move.ogg'><img src='Diversos/index.html@i=audio'/> move.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>9.04KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/confirmation.ogg'><img src='Diversos/index.html@i=audio'/> confirmation.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>8.76KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/splat.mp3'><img src='Diversos/index.html@i=audio'/> splat.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>31.97KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/countdown.m4a'><img src='Diversos/index.html@i=file'/> countdown.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>82.83KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/ballBounce.m4a'><img src='Diversos/index.html@i=file'/> ballBounce.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.7KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/hitBox.ogg'><img src='Diversos/index.html@i=audio'/> hitBox.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>13.47KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/win.wav'><img src='Diversos/index.html@i=audio'/> win.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>2.77MB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/collect.ogg'><img src='Diversos/index.html@i=audio'/> collect.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>9.69KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/hit-snowman.m4a'><img src='Diversos/index.html@i=file'/> hit-snowman.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.9KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/player-fire.ogg'><img src='Diversos/index.html@i=audio'/> player-fire.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>7.63KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/start.m4a'><img src='Diversos/index.html@i=file'/> start.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>10.24KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Db3.mp3'><img src='Diversos/index.html@i=audio'/> Db3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Quack.mp3'><img src='Diversos/index.html@i=audio'/> Quack.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>3.95KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/victory.ogg'><img src='Diversos/index.html@i=audio'/> victory.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>33.3KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/hurt.wav'><img src='Diversos/index.html@i=audio'/> hurt.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>18.36KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/fail.ogg'><img src='Diversos/index.html@i=audio'/> fail.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>32.51KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/intro_of_dragons.mp3'><img src='Diversos/index.html@i=audio'/> intro_of_dragons.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>1.29MB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/mouserelease1.ogg'><img src='Diversos/index.html@i=audio'/> mouserelease1.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.66KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/rollover1.ogg'><img src='Diversos/index.html@i=audio'/> rollover1.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.79KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/ShieldOnline.wav'><img src='Diversos/index.html@i=audio'/> ShieldOnline.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>55.97KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/music.ogg'><img src='Diversos/index.html@i=audio'/> music.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>415.47KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/MELODY-4.wav'><img src='Diversos/index.html@i=audio'/> MELODY-4.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>60.86KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/match.m4a'><img src='Diversos/index.html@i=file'/> match.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>25.17KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/rollover6.ogg'><img src='Diversos/index.html@i=audio'/> rollover6.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.26KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/right.mp3'><img src='Diversos/index.html@i=audio'/> right.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.9KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/intro.mp3'><img src='Diversos/index.html@i=audio'/> intro.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>387.58KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/match.mp3'><img src='Diversos/index.html@i=audio'/> match.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>14.13KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/explosion.ogg'><img src='Diversos/index.html@i=audio'/> explosion.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>16.4KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/ballHit.ogg'><img src='Diversos/index.html@i=audio'/> ballHit.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.58KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Pickup.wav'><img src='Diversos/index.html@i=audio'/> Pickup.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>29.65KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Hit_01.mp3'><img src='Diversos/index.html@i=audio'/> Hit_01.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.32KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/throw.m4a'><img src='Diversos/index.html@i=file'/> throw.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.56KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/MELODY-3.wav'><img src='Diversos/index.html@i=audio'/> MELODY-3.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>60.68KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/appear.mp3'><img src='Diversos/index.html@i=audio'/> appear.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>8.98KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/minimize.ogg'><img src='Diversos/index.html@i=audio'/> minimize.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>11.46KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/pickup.mp3'><img src='Diversos/index.html@i=audio'/> pickup.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.88KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/music.wav'><img src='Diversos/index.html@i=audio'/> music.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>551.51KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/twoTone1.ogg'><img src='Diversos/index.html@i=audio'/> twoTone1.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>7.19KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Ab3.mp3'><img src='Diversos/index.html@i=audio'/> Ab3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/appear.m4a'><img src='Diversos/index.html@i=file'/> appear.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.61KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/explosion.wav'><img src='Diversos/index.html@i=audio'/> explosion.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>101.54KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/death.wav'><img src='Diversos/index.html@i=audio'/> death.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>45.6KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/GhostFire.wav'><img src='Diversos/index.html@i=audio'/> GhostFire.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>24.09KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/PickUp.wav'><img src='Diversos/index.html@i=audio'/> PickUp.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>12.31KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/LeaderboardMusic.mp3'><img src='Diversos/index.html@i=audio'/> LeaderboardMusic.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>1.83MB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/player-explosion.wav'><img src='Diversos/index.html@i=audio'/> player-explosion.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>164.02KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/ShieldDown.wav'><img src='Diversos/index.html@i=audio'/> ShieldDown.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>33.57KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/select.ogg'><img src='Diversos/index.html@i=audio'/> select.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>6.2KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/fire.wav'><img src='Diversos/index.html@i=audio'/> fire.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>1.42KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/click1.ogg'><img src='Diversos/index.html@i=audio'/> click1.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.87KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Bb3.mp3'><img src='Diversos/index.html@i=audio'/> Bb3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/countdown.mp3'><img src='Diversos/index.html@i=audio'/> countdown.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>50.07KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Eb3.mp3'><img src='Diversos/index.html@i=audio'/> Eb3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/mouseclick1.ogg'><img src='Diversos/index.html@i=audio'/> mouseclick1.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.58KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/kill_the_enemy.mp3'><img src='Diversos/index.html@i=audio'/> kill_the_enemy.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>2.45KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/MELODY-1.wav'><img src='Diversos/index.html@i=audio'/> MELODY-1.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>60.44KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/flap.wav'><img src='Diversos/index.html@i=audio'/> flap.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>13.13KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/SceneStartSound.wav'><img src='Diversos/index.html@i=audio'/> SceneStartSound.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>26.74KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/D3.mp3'><img src='Diversos/index.html@i=audio'/> D3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/9mm.wav'><img src='Diversos/index.html@i=audio'/> 9mm.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>125.94KB</td>
+                                <td>2023-11-24 06:51:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/move.m4a'><img src='Diversos/index.html@i=file'/> move.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.9KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/C3.mp3'><img src='Diversos/index.html@i=audio'/> C3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/wrong.ogg'><img src='Diversos/index.html@i=audio'/> wrong.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.65KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/victory.mp3'><img src='Diversos/index.html@i=audio'/> victory.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>63.38KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/laugh.ogg'><img src='Diversos/index.html@i=audio'/> laugh.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>20.71KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/pickup.m4a'><img src='Diversos/index.html@i=file'/> pickup.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.42KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/player-fire.wav'><img src='Diversos/index.html@i=audio'/> player-fire.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>28.17KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/snd_score.wav'><img src='Diversos/index.html@i=audio'/> snd_score.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>7.86KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/lose.wav'><img src='Diversos/index.html@i=audio'/> lose.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>104.79KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/laugh.m4a'><img src='Diversos/index.html@i=file'/> laugh.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.58KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/cellolong.wav'><img src='Diversos/index.html@i=audio'/> cellolong.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>1.88MB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/powerup.wav'><img src='Diversos/index.html@i=audio'/> powerup.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>35.37KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/throw.ogg'><img src='Diversos/index.html@i=audio'/> throw.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>7.17KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/index.php.html'><img src='Diversos/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-04-20 12:40:36</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/tap1.wav'><img src='Diversos/index.html@i=audio'/> tap1.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>9.95KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/ballHit.m4a'><img src='Diversos/index.html@i=file'/> ballHit.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.7KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/jet.wav'><img src='Diversos/index.html@i=audio'/> jet.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>13.13KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/start.ogg'><img src='Diversos/index.html@i=audio'/> start.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>7.73KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/gameover.ogg'><img src='Diversos/index.html@i=audio'/> gameover.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>16.03KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/click4.ogg'><img src='Diversos/index.html@i=audio'/> click4.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.45KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/6sounds.mp3'><img src='Diversos/index.html@i=audio'/> 6sounds.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>268.95KB</td>
+                                <td>2023-11-24 06:51:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/SpiderNoise.wav'><img src='Diversos/index.html@i=audio'/> SpiderNoise.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>41.39KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/player-explosion.ogg'><img src='Diversos/index.html@i=audio'/> player-explosion.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>32.92KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/G3.mp3'><img src='Diversos/index.html@i=audio'/> G3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/fail.mp3'><img src='Diversos/index.html@i=audio'/> fail.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>63.38KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/rollover2.ogg'><img src='Diversos/index.html@i=audio'/> rollover2.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.59KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/ImpHop.wav'><img src='Diversos/index.html@i=audio'/> ImpHop.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>35.43KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/violons11.wav'><img src='Diversos/index.html@i=audio'/> violons11.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>1.88MB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/gameover.m4a'><img src='Diversos/index.html@i=file'/> gameover.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>14.25KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/select_003.ogg'><img src='Diversos/index.html@i=audio'/> select_003.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>6.74KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/jump.ogg'><img src='Diversos/index.html@i=audio'/> jump.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.83KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/intro.ogg'><img src='Diversos/index.html@i=audio'/> intro.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>509.54KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/kill_the_enemy.ogg'><img src='Diversos/index.html@i=audio'/> kill_the_enemy.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.64KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/ballMissed.ogg'><img src='Diversos/index.html@i=audio'/> ballMissed.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>10.74KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/F3.mp3'><img src='Diversos/index.html@i=audio'/> F3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/select.mp3'><img src='Diversos/index.html@i=audio'/> select.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>8.57KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/next.wav'><img src='Diversos/index.html@i=audio'/> next.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.31KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/HitRock.wav'><img src='Diversos/index.html@i=audio'/> HitRock.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>43.65KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/MELODY-2.wav'><img src='Diversos/index.html@i=audio'/> MELODY-2.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>60.49KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/pickup.ogg'><img src='Diversos/index.html@i=audio'/> pickup.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>6.33KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/PlayerDamage.wav'><img src='Diversos/index.html@i=audio'/> PlayerDamage.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>66.76KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/EnemyDeath.wav'><img src='Diversos/index.html@i=audio'/> EnemyDeath.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>126.46KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/start.mp3'><img src='Diversos/index.html@i=audio'/> start.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>8.63KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/combo.wav'><img src='Diversos/index.html@i=audio'/> combo.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>36.95KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/sfx_wing.wav'><img src='Diversos/index.html@i=audio'/> sfx_wing.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>23.54KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/match.ogg'><img src='Diversos/index.html@i=audio'/> match.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>13.88KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/sfx_point.wav'><img src='Diversos/index.html@i=audio'/> sfx_point.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>25.02KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/music.m4a'><img src='Diversos/index.html@i=file'/> music.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>486.07KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/bounce.wav'><img src='Diversos/index.html@i=audio'/> bounce.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>111.3KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/sfx_shieldUp.ogg'><img src='Diversos/index.html@i=audio'/> sfx_shieldUp.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>9.57KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/tap3.wav'><img src='Diversos/index.html@i=audio'/> tap3.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>9.95KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/gameover.mp3'><img src='Diversos/index.html@i=audio'/> gameover.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>15.38KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/enemy-fire.ogg'><img src='Diversos/index.html@i=audio'/> enemy-fire.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.42KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/powerup.ogg'><img src='Diversos/index.html@i=audio'/> powerup.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>7.04KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/MenuButtomPress.wav'><img src='Diversos/index.html@i=audio'/> MenuButtomPress.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>11.24KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/music.mp3'><img src='Diversos/index.html@i=audio'/> music.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>631.55KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/snd_hit.wav'><img src='Diversos/index.html@i=audio'/> snd_hit.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>234B</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/CloseChest.wav'><img src='Diversos/index.html@i=audio'/> CloseChest.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>10.38KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/laugh.mp3'><img src='Diversos/index.html@i=audio'/> laugh.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>28.5KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/dead.mp3'><img src='Diversos/index.html@i=audio'/> dead.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>6.56KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/item.ogg'><img src='Diversos/index.html@i=audio'/> item.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>6.25KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/8bit-fall.wav'><img src='Diversos/index.html@i=audio'/> 8bit-fall.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>279.04KB</td>
+                                <td>2023-11-24 06:51:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/ballMissed.m4a'><img src='Diversos/index.html@i=file'/> ballMissed.m4a</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.49KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/maximize_001.ogg'><img src='Diversos/index.html@i=audio'/> maximize_001.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>11.83KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/hit-snowman.mp3'><img src='Diversos/index.html@i=audio'/> hit-snowman.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>8.04KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/hit.wav'><img src='Diversos/index.html@i=audio'/> hit.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>2.26KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/B3.mp3'><img src='Diversos/index.html@i=audio'/> B3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/magic&#32;space.mp3'><img src='Diversos/index.html@i=audio'/> magic space.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>2.09MB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/PlayerDeath.wav'><img src='Diversos/index.html@i=audio'/> PlayerDeath.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>49.73KB</td>
+                                <td>2023-11-24 06:51:44</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/yeah.mp3'><img src='Diversos/index.html@i=audio'/> yeah.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>26.45KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/dead.ogg'><img src='Diversos/index.html@i=audio'/> dead.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.5KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/Bounce.wav'><img src='Diversos/index.html@i=audio'/> Bounce.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>31.04KB</td>
+                                <td>2023-11-24 06:51:42</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/click5.ogg'><img src='Diversos/index.html@i=audio'/> click5.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.43KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/rollover5.ogg'><img src='Diversos/index.html@i=audio'/> rollover5.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>5.13KB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/A3.mp3'><img src='Diversos/index.html@i=audio'/> A3.mp3</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>46.12KB</td>
+                                <td>2023-11-24 06:51:40</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/violons18.wav'><img src='Diversos/index.html@i=audio'/> violons18.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>1.88MB</td>
+                                <td>2023-11-24 06:51:48</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/ballBounce.ogg'><img src='Diversos/index.html@i=audio'/> ballBounce.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>4.58KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/appear.ogg'><img src='Diversos/index.html@i=audio'/> appear.ogg</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>7.62KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9mb25lcy5wbmc="/>'><a href='Diversos/fones.png'><img src='Diversos/index.html@i=image'/> fones.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>13.82KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Diversos/gunshot.wav'><img src='Diversos/index.html@i=audio'/> gunshot.wav</a></td>
+                                                
+                                <td>Audio</td>
+                                <td>369.63KB</td>
+                                <td>2023-11-24 06:51:46</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

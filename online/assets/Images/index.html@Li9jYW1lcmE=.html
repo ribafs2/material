@@ -1,0 +1,915 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li9JbWFnZXM=.html'>Família Ferreira de Sousa</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZW5kZXIgdG8gdGV4dHVyZSBzaGFkZXIgNi5wbmc="/>'><a href='camera/render&#32;to&#32;texture&#32;shader&#32;6.png'><img src='camera/index.html@i=image'/> render to texture shader 6.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>375KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZW1vdmUgY2FtZXJhIG9uIGNsaWNrLnBuZw=="/>'><a href='camera/remove&#32;camera&#32;on&#32;click.png'><img src='camera/index.html@i=image'/> remove camera on click.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>156.32KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zY3JvbGwgdmlldy5wbmc="/>'><a href='camera/scroll&#32;view.png'><img src='camera/index.html@i=image'/> scroll view.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>426.2KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8xNiBjYW1lcmEgc2hhZGVyIHRlc3QucG5n"/>'><a href='camera/16&#32;camera&#32;shader&#32;test.png'><img src='camera/index.html@i=image'/> 16 camera shader test.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>483.52KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9mb2xsb3cgc3ByaXRlIHdpdGggZGVhZHpvbmUucG5n"/>'><a href='camera/follow&#32;sprite&#32;with&#32;deadzone.png'><img src='camera/index.html@i=image'/> follow sprite with deadzone.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>144.92KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZW5kZXIgdG8gdGV4dHVyZS5wbmc="/>'><a href='camera/render&#32;to&#32;texture.png'><img src='camera/index.html@i=image'/> render to texture.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>55.19KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9pZ25vcmUgZ2FtZW9iamVjdHMgaW4gY29udGFpbmVycy5wbmc="/>'><a href='camera/ignore&#32;gameobjects&#32;in&#32;containers.png'><img src='camera/index.html@i=image'/> ignore gameobjects in containers.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>67.61KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZW5kZXIgdG8gdGV4dHVyZSBzaGFkZXIucG5n"/>'><a href='camera/render&#32;to&#32;texture&#32;shader.png'><img src='camera/index.html@i=image'/> render to texture shader.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>567.19KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZW5kZXIgdG8gdGV4dHVyZSBzaGFkZXIgMy5wbmc="/>'><a href='camera/render&#32;to&#32;texture&#32;shader&#32;3.png'><img src='camera/index.html@i=image'/> render to texture shader 3.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>618.45KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jaGFuZ2UgY2FtZXJhIHNoYWRlci5wbmc="/>'><a href='camera/change&#32;camera&#32;shader.png'><img src='camera/index.html@i=image'/> change camera shader.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>448.38KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9nYW1lIHNoYWRlciB0ZXN0IDEucG5n"/>'><a href='camera/game&#32;shader&#32;test&#32;1.png'><img src='camera/index.html@i=image'/> game shader test 1.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>7.51KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9iYWNrZ3JvdW5kIGNvbG9yLnBuZw=="/>'><a href='camera/background&#32;color.png'><img src='camera/index.html@i=image'/> background color.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>21.71KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYW1lcmEgZmFkZSBpbiBhbmQgb3V0LnBuZw=="/>'><a href='camera/camera&#32;fade&#32;in&#32;and&#32;out.png'><img src='camera/index.html@i=image'/> camera fade in and out.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>295.05KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9mb2xsb3cgc3ByaXRlIHNtYWxsIGJvdW5kcy5wbmc="/>'><a href='camera/follow&#32;sprite&#32;small&#32;bounds.png'><img src='camera/index.html@i=image'/> follow sprite small bounds.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>16.18KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zZXQgdmlld3BvcnQucG5n"/>'><a href='camera/set&#32;viewport.png'><img src='camera/index.html@i=image'/> set viewport.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>39.65KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9iYXNpY3MucG5n"/>'><a href='camera/basics.png'><img src='camera/index.html@i=image'/> basics.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>431.59KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZW5kZXIgdG8gdGV4dHVyZSBzaGFkZXIgNC5wbmc="/>'><a href='camera/render&#32;to&#32;texture&#32;shader&#32;4.png'><img src='camera/index.html@i=image'/> render to texture shader 4.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>602.46KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9mb2xsb3cgdXNlciBjb250cm9sbGVkIHNwcml0ZS5wbmc="/>'><a href='camera/follow&#32;user&#32;controlled&#32;sprite.png'><img src='camera/index.html@i=image'/> follow user controlled sprite.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>543.12KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9pZ25vcmUgZ2FtZW9iamVjdHMucG5n"/>'><a href='camera/ignore&#32;gameobjects.png'><img src='camera/index.html@i=image'/> ignore gameobjects.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>67.61KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yb3VuZCBwaXhlbHMucG5n"/>'><a href='camera/round&#32;pixels.png'><img src='camera/index.html@i=image'/> round pixels.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>4.69KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9ib3VuZHMgYXQgemVyby5wbmc="/>'><a href='camera/bounds&#32;at&#32;zero.png'><img src='camera/index.html@i=image'/> bounds at zero.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>87.88KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYW1lcmEgZWZmZWN0cy5wbmc="/>'><a href='camera/camera&#32;effects.png'><img src='camera/index.html@i=image'/> camera effects.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>63.17KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYW1lcmEgZmlsdGVyLnBuZw=="/>'><a href='camera/camera&#32;filter.png'><img src='camera/index.html@i=image'/> camera filter.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>587.57KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9mYWRlLnBuZw=="/>'><a href='camera/fade.png'><img src='camera/index.html@i=image'/> fade.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>925.09KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYW1lcmEgZWZmZWN0IGNhbGxiYWNrcy5wbmc="/>'><a href='camera/camera&#32;effect&#32;callbacks.png'><img src='camera/index.html@i=image'/> camera effect callbacks.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.17KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9maXhlZCB0byBjYW1lcmEucG5n"/>'><a href='camera/fixed&#32;to&#32;camera.png'><img src='camera/index.html@i=image'/> fixed to camera.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>614.84KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yb3RhdGUgY2FtZXJhLnBuZw=="/>'><a href='camera/rotate&#32;camera.png'><img src='camera/index.html@i=image'/> rotate camera.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>84.96KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYW1lcmEgYWxwaGEucG5n"/>'><a href='camera/camera&#32;alpha.png'><img src='camera/index.html@i=image'/> camera alpha.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>98.97KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zZXQgYm91bmRzLnBuZw=="/>'><a href='camera/set&#32;bounds.png'><img src='camera/index.html@i=image'/> set bounds.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>391.46KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZW5kZXIgdG8gdGV4dHVyZSBzaGFkZXIgMi5wbmc="/>'><a href='camera/render&#32;to&#32;texture&#32;shader&#32;2.png'><img src='camera/index.html@i=image'/> render to texture shader 2.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>769.16KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYW1lcmFzIGZyb20gc3RhdGUgY29uZmlnLnBuZw=="/>'><a href='camera/cameras&#32;from&#32;state&#32;config.png'><img src='camera/index.html@i=image'/> cameras from state config.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>137.95KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9nYW1lIHNoYWRlciB0ZXN0IDMucG5n"/>'><a href='camera/game&#32;shader&#32;test&#32;3.png'><img src='camera/index.html@i=image'/> game shader test 3.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>68.45KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zZXQgc2Nyb2xsIGZhY3Rvci5wbmc="/>'><a href='camera/set&#32;scroll&#32;factor.png'><img src='camera/index.html@i=image'/> set scroll factor.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>615.29KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9ncmFwaGljcyBsYW5kc2NhcGUucG5n"/>'><a href='camera/graphics&#32;landscape.png'><img src='camera/index.html@i=image'/> graphics landscape.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>7.09KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='camera/index.php.html'><img src='camera/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-04-20 12:40:36</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9mb2xsb3cgem9vbSB0aWxlbWFwLnBuZw=="/>'><a href='camera/follow&#32;zoom&#32;tilemap.png'><img src='camera/index.html@i=image'/> follow zoom tilemap.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>5.63KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8xNiBjYW1lcmEgdGVzdC5wbmc="/>'><a href='camera/16&#32;camera&#32;test.png'><img src='camera/index.html@i=image'/> 16 camera test.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>235.81KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li90aWxlIG1hcCB3aXRoIGNhbWVyYSBzaGFrZS5wbmc="/>'><a href='camera/tile&#32;map&#32;with&#32;camera&#32;shake.png'><img src='camera/index.html@i=image'/> tile map with camera shake.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>46.15KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9yZW5kZXIgdG8gdGV4dHVyZSBzaGFkZXIgNS5wbmc="/>'><a href='camera/render&#32;to&#32;texture&#32;shader&#32;5.png'><img src='camera/index.html@i=image'/> render to texture shader 5.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>724.31KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li93b3JsZCBjb29yZGluYXRlIGZyb20gYW5vdGhlciBzY2VuZS5wbmc="/>'><a href='camera/world&#32;coordinate&#32;from&#32;another&#32;scene.png'><img src='camera/index.html@i=image'/> world coordinate from another scene.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>43.65KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zaGFrZS5wbmc="/>'><a href='camera/shake.png'><img src='camera/index.html@i=image'/> shake.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>925.09KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li93b3JsZCBjYW1lcmEucG5n"/>'><a href='camera/world&#32;camera.png'><img src='camera/index.html@i=image'/> world camera.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>320.06KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='camera/index.html@Li9tdWx0aSBjYW1lcmE=.html'><img src='camera/index.html@i=folder'/> multi camera</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-05-13 06:03:40</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zZXQgc21hbGwgYm91bmRzLnBuZw=="/>'><a href='camera/set&#32;small&#32;bounds.png'><img src='camera/index.html@i=image'/> set small bounds.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>153.08KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li96b29tIHRvLnBuZw=="/>'><a href='camera/zoom&#32;to.png'><img src='camera/index.html@i=image'/> zoom to.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>59.34KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9mb2xsb3cgb2Zmc2V0LnBuZw=="/>'><a href='camera/follow&#32;offset.png'><img src='camera/index.html@i=image'/> follow offset.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>595.99KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9taW5pbWFwIGNhbWVyYS5wbmc="/>'><a href='camera/minimap&#32;camera.png'><img src='camera/index.html@i=image'/> minimap camera.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>30.53KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9pZ25vcmUucG5n"/>'><a href='camera/ignore.png'><img src='camera/index.html@i=image'/> ignore.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>596.56KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYW1lcmEgYmx1ciBzaGFkZXIucG5n"/>'><a href='camera/camera&#32;blur&#32;shader.png'><img src='camera/index.html@i=image'/> camera blur shader.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>194.84KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9hZGQgY2FtZXJhIG9uIGNsaWNrLnBuZw=="/>'><a href='camera/add&#32;camera&#32;on&#32;click.png'><img src='camera/index.html@i=image'/> add camera on click.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>31.2KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zaGFkZXIgbXVsdGkgY2FtIHRlc3QucG5n"/>'><a href='camera/shader&#32;multi&#32;cam&#32;test.png'><img src='camera/index.html@i=image'/> shader multi cam test.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>416.35KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9mb2xsb3cgem9vbS5wbmc="/>'><a href='camera/follow&#32;zoom.png'><img src='camera/index.html@i=image'/> follow zoom.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>18.05KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zaW5nbGUgc21hbGwgY2FtZXJhLnBuZw=="/>'><a href='camera/single&#32;small&#32;camera.png'><img src='camera/index.html@i=image'/> single small camera.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>223.36KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9pZ25vcmUgY29udGFpbmVyLnBuZw=="/>'><a href='camera/ignore&#32;container.png'><img src='camera/index.html@i=image'/> ignore container.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>599.24KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9tb3ZlIGNhbWVyYSB3aXRoIGtleXMucG5n"/>'><a href='camera/move&#32;camera&#32;with&#32;keys.png'><img src='camera/index.html@i=image'/> move camera with keys.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>74.14KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zZWxlY3Qgc2hhZGVyIHRlc3QucG5n"/>'><a href='camera/select&#32;shader&#32;test.png'><img src='camera/index.html@i=image'/> select shader test.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>236.06KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9iYWNrZ3JvdW5kIGNvbG9yIGludGVycG9sYXRlLnBuZw=="/>'><a href='camera/background&#32;color&#32;interpolate.png'><img src='camera/index.html@i=image'/> background color interpolate.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>28.59KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jcm9zcyBzY2VuZSBvYmplY3QgcGxhY2VtZW50LnBuZw=="/>'><a href='camera/cross&#32;scene&#32;object&#32;placement.png'><img src='camera/index.html@i=image'/> cross scene object placement.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>39.13KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9nYW1lIHNoYWRlciB0ZXN0IDIucG5n"/>'><a href='camera/game&#32;shader&#32;test&#32;2.png'><img src='camera/index.html@i=image'/> game shader test 2.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>68.57KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li93b3JsZCB2aWV3LnBuZw=="/>'><a href='camera/world&#32;view.png'><img src='camera/index.html@i=image'/> world view.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>50.01KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9tdWx0aXBsZSBjYW1lcmFzLnBuZw=="/>'><a href='camera/multiple&#32;cameras.png'><img src='camera/index.html@i=image'/> multiple cameras.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>419.37KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9mb2xsb3cgc3ByaXRlLnBuZw=="/>'><a href='camera/follow&#32;sprite.png'><img src='camera/index.html@i=image'/> follow sprite.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>107.8KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9vdmVybGFwLnBuZw=="/>'><a href='camera/overlap.png'><img src='camera/index.html@i=image'/> overlap.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>46.16KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9pZ25vcmUgZ3JvdXAgY2hpbGRyZW4ucG5n"/>'><a href='camera/ignore&#32;group&#32;children.png'><img src='camera/index.html@i=image'/> ignore group children.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>601KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8zMiBjYW1lcmEgdGVzdC5wbmc="/>'><a href='camera/32&#32;camera&#32;test.png'><img src='camera/index.html@i=image'/> 32 camera test.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>116.27KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9nZXQgd29ybGQgcG9pbnQucG5n"/>'><a href='camera/get&#32;world&#32;point.png'><img src='camera/index.html@i=image'/> get world point.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>29.55KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9vcmlnaW4ucG5n"/>'><a href='camera/origin.png'><img src='camera/index.html@i=image'/> origin.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>633.44KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9wYW4gdG8ucG5n"/>'><a href='camera/pan&#32;to.png'><img src='camera/index.html@i=image'/> pan to.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>23.67KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYW1lcmEgZmFkZSBvdXQgYW5kIGluLnBuZw=="/>'><a href='camera/camera&#32;fade&#32;out&#32;and&#32;in.png'><img src='camera/index.html@i=image'/> camera fade out and in.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>568.81KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYW1lcmEgY2VudGVyIG9uLnBuZw=="/>'><a href='camera/camera&#32;center&#32;on.png'><img src='camera/index.html@i=image'/> camera center on.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>18.63KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9mbGFzaC5wbmc="/>'><a href='camera/flash.png'><img src='camera/index.html@i=image'/> flash.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>925.09KB</td>
+                                <td>2023-11-24 06:52:02</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

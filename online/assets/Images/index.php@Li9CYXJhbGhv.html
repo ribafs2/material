@@ -1,0 +1,1932 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li9JbWFnZXM=.html'>Família Ferreira de Sousa</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtMi5wbmc="/>'><a href='Baralho/spades-2.png'><img src='Baralho/index.html@i=image'/> spades-2.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.19KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX2hlYXJ0c18wMi5wbmc="/>'><a href='Baralho/card_hearts_02.png'><img src='Baralho/index.html@i=image'/> card_hearts_02.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>267B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyAwNS5wbmc="/>'><a href='Baralho/Large&#32;Card_Spades&#32;05.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades 05.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>285B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy0xMy5wbmc="/>'><a href='Baralho/clubs-13.png'><img src='Baralho/index.html@i=image'/> clubs-13.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>10.38KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNTEucG5n"/>'><a href='Baralho/051.png'><img src='Baralho/index.html@i=image'/> 051.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>112.69KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNDIucG5n"/>'><a href='Baralho/042.png'><img src='Baralho/index.html@i=image'/> 042.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>15.17KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIDEwLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;10.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds 10.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>295B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtMTIucG5n"/>'><a href='Baralho/hearts-12.png'><img src='Baralho/index.html@i=image'/> hearts-12.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>13.82KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIDA3LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Clubs&#32;07.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs 07.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>288B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyAwNy5wbmc="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;07.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts 07.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>315B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX2NsdWJzXzAyLnBuZw=="/>'><a href='Baralho/card_clubs_02.png'><img src='Baralho/index.html@i=image'/> card_clubs_02.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>241B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyAwNi5wbmc="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;06.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts 06.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>293B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy04LnBuZw=="/>'><a href='Baralho/clubs-8.png'><img src='Baralho/index.html@i=image'/> clubs-8.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.09KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyAwOS5wbmc="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;09.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts 09.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>325B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy0yLnBuZw=="/>'><a href='Baralho/clubs-2.png'><img src='Baralho/index.html@i=image'/> clubs-2.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.19KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyAxMC5wbmc="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;10.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts 10.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>335B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtMTEucG5n"/>'><a href='Baralho/hearts-11.png'><img src='Baralho/index.html@i=image'/> hearts-11.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>13.33KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX2JhY2sucG5n"/>'><a href='Baralho/card_back.png'><img src='Baralho/index.html@i=image'/> card_back.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>231B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIDA2LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;06.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds 06.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>284B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy0xMS5wbmc="/>'><a href='Baralho/clubs-11.png'><img src='Baralho/index.html@i=image'/> clubs-11.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>11.38KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMzQucG5n"/>'><a href='Baralho/034.png'><img src='Baralho/index.html@i=image'/> 034.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>51.55KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMTIucG5n"/>'><a href='Baralho/012.png'><img src='Baralho/index.html@i=image'/> 012.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>126.35KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy0xMy5wbmc="/>'><a href='Baralho/diamonds-13.png'><img src='Baralho/index.html@i=image'/> diamonds-13.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>12.66KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNDMucG5n"/>'><a href='Baralho/043.png'><img src='Baralho/index.html@i=image'/> 043.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>17.63KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMzMucG5n"/>'><a href='Baralho/033.png'><img src='Baralho/index.html@i=image'/> 033.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>46.3KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIDA1LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;05.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds 05.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>288B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyBRLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;Q.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts Q.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>385B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIEoucG5n"/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;J.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds J.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>367B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkczQucG5n"/>'><a href='Baralho/cards4.png'><img src='Baralho/index.html@i=image'/> cards4.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>33.97KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIDA5LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;09.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds 09.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>314B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyAwMy5wbmc="/>'><a href='Baralho/Large&#32;Card_Spades&#32;03.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades 03.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>275B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIDAzLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;03.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds 03.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>280B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0VtcHR5LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Empty.png'><img src='Baralho/index.html@i=image'/> Large Card_Empty.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>192B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIDA5LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Clubs&#32;09.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs 09.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>311B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNDQucG5n"/>'><a href='Baralho/044.png'><img src='Baralho/index.html@i=image'/> 044.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>19.47KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMjIucG5n"/>'><a href='Baralho/022.png'><img src='Baralho/index.html@i=image'/> 022.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>27.4KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX3NwYWRlc18wMi5wbmc="/>'><a href='Baralho/card_spades_02.png'><img src='Baralho/index.html@i=image'/> card_spades_02.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>243B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyBKLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;J.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts J.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>387B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNDAucG5n"/>'><a href='Baralho/040.png'><img src='Baralho/index.html@i=image'/> 040.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>11.23KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMzYucG5n"/>'><a href='Baralho/036.png'><img src='Baralho/index.html@i=image'/> 036.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>127.2KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyBRLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Spades&#32;Q.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades Q.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>368B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMTgucG5n"/>'><a href='Baralho/018.png'><img src='Baralho/index.html@i=image'/> 018.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>18.98KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMzkucG5n"/>'><a href='Baralho/039.png'><img src='Baralho/index.html@i=image'/> 039.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>9.12KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNDgucG5n"/>'><a href='Baralho/048.png'><img src='Baralho/index.html@i=image'/> 048.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>28.07KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy00LnBuZw=="/>'><a href='Baralho/diamonds-4.png'><img src='Baralho/index.html@i=image'/> diamonds-4.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>6.45KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy0zLnBuZw=="/>'><a href='Baralho/clubs-3.png'><img src='Baralho/index.html@i=image'/> clubs-3.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.59KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIDA1LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Clubs&#32;05.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs 05.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>279B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMDAucG5n"/>'><a href='Baralho/000.png'><img src='Baralho/index.html@i=image'/> 000.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>19.48KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkczEucG5n"/>'><a href='Baralho/cards1.png'><img src='Baralho/index.html@i=image'/> cards1.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>66.66KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNDUucG5n"/>'><a href='Baralho/045.png'><img src='Baralho/index.html@i=image'/> 045.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>20.91KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtMS5wbmc="/>'><a href='Baralho/spades-1.png'><img src='Baralho/index.html@i=image'/> spades-1.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>5.69KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy02LnBuZw=="/>'><a href='Baralho/diamonds-6.png'><img src='Baralho/index.html@i=image'/> diamonds-6.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>8.44KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX2RpYW1vbmRzXzAzLnBuZw=="/>'><a href='Baralho/card_diamonds_03.png'><img src='Baralho/index.html@i=image'/> card_diamonds_03.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>254B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMTEucG5n"/>'><a href='Baralho/011.png'><img src='Baralho/index.html@i=image'/> 011.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>123.87KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtMTAucG5n"/>'><a href='Baralho/hearts-10.png'><img src='Baralho/index.html@i=image'/> hearts-10.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>9.71KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtNS5wbmc="/>'><a href='Baralho/hearts-5.png'><img src='Baralho/index.html@i=image'/> hearts-5.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>8.92KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtMTIucG5n"/>'><a href='Baralho/spades-12.png'><img src='Baralho/index.html@i=image'/> spades-12.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>12.44KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMjEucG5n"/>'><a href='Baralho/021.png'><img src='Baralho/index.html@i=image'/> 021.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>24.76KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtNi5wbmc="/>'><a href='Baralho/hearts-6.png'><img src='Baralho/index.html@i=image'/> hearts-6.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>9.68KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMjQucG5n"/>'><a href='Baralho/024.png'><img src='Baralho/index.html@i=image'/> 024.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>121.99KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkczIucG5n"/>'><a href='Baralho/cards2.png'><img src='Baralho/index.html@i=image'/> cards2.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>70.13KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMDIucG5n"/>'><a href='Baralho/002.png'><img src='Baralho/index.html@i=image'/> 002.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>30.24KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtMTMucG5n"/>'><a href='Baralho/spades-13.png'><img src='Baralho/index.html@i=image'/> spades-13.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>10.89KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy0zLnBuZw=="/>'><a href='Baralho/diamonds-3.png'><img src='Baralho/index.html@i=image'/> diamonds-3.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>7.19KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMjgucG5n"/>'><a href='Baralho/028.png'><img src='Baralho/index.html@i=image'/> 028.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>23.65KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy03LnBuZw=="/>'><a href='Baralho/clubs-7.png'><img src='Baralho/index.html@i=image'/> clubs-7.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.45KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMTQucG5n"/>'><a href='Baralho/014.png'><img src='Baralho/index.html@i=image'/> 014.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>11.31KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy0xMC5wbmc="/>'><a href='Baralho/diamonds-10.png'><img src='Baralho/index.html@i=image'/> diamonds-10.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>9.11KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyAwOS5wbmc="/>'><a href='Baralho/Large&#32;Card_Spades&#32;09.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades 09.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>310B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtNy5wbmc="/>'><a href='Baralho/hearts-7.png'><img src='Baralho/index.html@i=image'/> hearts-7.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>11.49KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy0xMi5wbmc="/>'><a href='Baralho/diamonds-12.png'><img src='Baralho/index.html@i=image'/> diamonds-12.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>13.37KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyBBLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Spades&#32;A.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades A.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>242B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMDcucG5n"/>'><a href='Baralho/007.png'><img src='Baralho/index.html@i=image'/> 007.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>56.69KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9iYWNrLnBuZw=="/>'><a href='Baralho/back.png'><img src='Baralho/index.html@i=image'/> back.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>166.78KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy05LnBuZw=="/>'><a href='Baralho/diamonds-9.png'><img src='Baralho/index.html@i=image'/> diamonds-9.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>9.75KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy0xLnBuZw=="/>'><a href='Baralho/clubs-1.png'><img src='Baralho/index.html@i=image'/> clubs-1.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.06KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMDQucG5n"/>'><a href='Baralho/004.png'><img src='Baralho/index.html@i=image'/> 004.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>40KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy01LnBuZw=="/>'><a href='Baralho/diamonds-5.png'><img src='Baralho/index.html@i=image'/> diamonds-5.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>8.52KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyAwNy5wbmc="/>'><a href='Baralho/Large&#32;Card_Spades&#32;07.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades 07.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>283B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIDA0LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Clubs&#32;04.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs 04.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>257B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy03LnBuZw=="/>'><a href='Baralho/diamonds-7.png'><img src='Baralho/index.html@i=image'/> diamonds-7.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>10.94KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtOC5wbmc="/>'><a href='Baralho/hearts-8.png'><img src='Baralho/index.html@i=image'/> hearts-8.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>8.59KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyBKLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Spades&#32;J.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades J.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>368B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyAwMy5wbmc="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;03.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts 03.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>288B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX2hlYXJ0c18wMy5wbmc="/>'><a href='Baralho/card_hearts_03.png'><img src='Baralho/index.html@i=image'/> card_hearts_03.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>269B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtNy5wbmc="/>'><a href='Baralho/spades-7.png'><img src='Baralho/index.html@i=image'/> spades-7.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.37KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMDYucG5n"/>'><a href='Baralho/006.png'><img src='Baralho/index.html@i=image'/> 006.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>50.75KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNDYucG5n"/>'><a href='Baralho/046.png'><img src='Baralho/index.html@i=image'/> 046.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>23.64KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMjAucG5n"/>'><a href='Baralho/020.png'><img src='Baralho/index.html@i=image'/> 020.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>22.71KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyBLLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Spades&#32;K.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades K.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>375B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIEsucG5n"/>'><a href='Baralho/Large&#32;Card_Clubs&#32;K.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs K.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>371B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkczUucG5n"/>'><a href='Baralho/cards5.png'><img src='Baralho/index.html@i=image'/> cards5.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>57.5KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIDA0LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;04.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds 04.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>261B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkczYucG5n"/>'><a href='Baralho/cards6.png'><img src='Baralho/index.html@i=image'/> cards6.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>53.29KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNDEucG5n"/>'><a href='Baralho/041.png'><img src='Baralho/index.html@i=image'/> 041.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>13.53KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX3NwYWRlc18wMy5wbmc="/>'><a href='Baralho/card_spades_03.png'><img src='Baralho/index.html@i=image'/> card_spades_03.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>245B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIDA2LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Clubs&#32;06.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs 06.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>277B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyAwOC5wbmc="/>'><a href='Baralho/Large&#32;Card_Spades&#32;08.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades 08.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>298B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtMTAucG5n"/>'><a href='Baralho/spades-10.png'><img src='Baralho/index.html@i=image'/> spades-10.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.21KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMjUucG5n"/>'><a href='Baralho/025.png'><img src='Baralho/index.html@i=image'/> 025.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>114.32KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNDcucG5n"/>'><a href='Baralho/047.png'><img src='Baralho/index.html@i=image'/> 047.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>25.28KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyBBLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;A.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts A.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>262B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy05LnBuZw=="/>'><a href='Baralho/clubs-9.png'><img src='Baralho/index.html@i=image'/> clubs-9.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.37KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyAwNC5wbmc="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;04.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts 04.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>282B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtNi5wbmc="/>'><a href='Baralho/spades-6.png'><img src='Baralho/index.html@i=image'/> spades-6.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.21KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIEoucG5n"/>'><a href='Baralho/Large&#32;Card_Clubs&#32;J.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs J.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>361B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIDA4LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;08.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds 08.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>300B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMzUucG5n"/>'><a href='Baralho/035.png'><img src='Baralho/index.html@i=image'/> 035.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>56.97KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMTMucG5n"/>'><a href='Baralho/013.png'><img src='Baralho/index.html@i=image'/> 013.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>9.25KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIDA4LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Clubs&#32;08.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs 08.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>285B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMDkucG5n"/>'><a href='Baralho/009.png'><img src='Baralho/index.html@i=image'/> 009.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>68.37KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Baralho/index.php.html'><img src='Baralho/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-04-20 12:40:36</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIDAyLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;02.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds 02.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>272B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy0xMS5wbmc="/>'><a href='Baralho/diamonds-11.png'><img src='Baralho/index.html@i=image'/> diamonds-11.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>12.7KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMjYucG5n"/>'><a href='Baralho/026.png'><img src='Baralho/index.html@i=image'/> 026.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>15.92KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy0xMC5wbmc="/>'><a href='Baralho/clubs-10.png'><img src='Baralho/index.html@i=image'/> clubs-10.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.3KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtNC5wbmc="/>'><a href='Baralho/hearts-4.png'><img src='Baralho/index.html@i=image'/> hearts-4.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>7.27KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkczAucG5n"/>'><a href='Baralho/cards0.png'><img src='Baralho/index.html@i=image'/> cards0.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>69.56KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyAxMC5wbmc="/>'><a href='Baralho/Large&#32;Card_Spades&#32;10.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades 10.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>301B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMjkucG5n"/>'><a href='Baralho/029.png'><img src='Baralho/index.html@i=image'/> 029.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>28.23KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtMTMucG5n"/>'><a href='Baralho/hearts-13.png'><img src='Baralho/index.html@i=image'/> hearts-13.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>12.96KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtMy5wbmc="/>'><a href='Baralho/hearts-3.png'><img src='Baralho/index.html@i=image'/> hearts-3.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>7.66KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyAwMi5wbmc="/>'><a href='Baralho/Large&#32;Card_Spades&#32;02.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades 02.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>267B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtOS5wbmc="/>'><a href='Baralho/hearts-9.png'><img src='Baralho/index.html@i=image'/> hearts-9.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>9.99KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIDAzLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Clubs&#32;03.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs 03.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>266B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMDMucG5n"/>'><a href='Baralho/003.png'><img src='Baralho/index.html@i=image'/> 003.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>35.06KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMjcucG5n"/>'><a href='Baralho/027.png'><img src='Baralho/index.html@i=image'/> 027.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>21.05KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy0xLnBuZw=="/>'><a href='Baralho/diamonds-1.png'><img src='Baralho/index.html@i=image'/> diamonds-1.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>5.39KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIDAyLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Clubs&#32;02.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs 02.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>263B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0JsYWNrIEpva2VyLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Black&#32;Joker.png'><img src='Baralho/index.html@i=image'/> Large Card_Black Joker.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>334B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMzgucG5n"/>'><a href='Baralho/038.png'><img src='Baralho/index.html@i=image'/> 038.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>123.19KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMTcucG5n"/>'><a href='Baralho/017.png'><img src='Baralho/index.html@i=image'/> 017.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>17.41KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX2NsdWJzXzAzLnBuZw=="/>'><a href='Baralho/card_clubs_03.png'><img src='Baralho/index.html@i=image'/> card_clubs_03.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>244B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtOC5wbmc="/>'><a href='Baralho/spades-8.png'><img src='Baralho/index.html@i=image'/> spades-8.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.02KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMzAucG5n"/>'><a href='Baralho/030.png'><img src='Baralho/index.html@i=image'/> 030.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>33.11KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy02LnBuZw=="/>'><a href='Baralho/clubs-6.png'><img src='Baralho/index.html@i=image'/> clubs-6.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIDA3LnBuZw=="/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;07.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds 07.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>290B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyAwNS5wbmc="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;05.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts 05.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>317B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMTkucG5n"/>'><a href='Baralho/019.png'><img src='Baralho/index.html@i=image'/> 019.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>20.88KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtMTEucG5n"/>'><a href='Baralho/spades-11.png'><img src='Baralho/index.html@i=image'/> spades-11.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>11.07KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyAwOC5wbmc="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;08.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts 08.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>326B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMTAucG5n"/>'><a href='Baralho/010.png'><img src='Baralho/index.html@i=image'/> 010.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>123.44KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX2RpYW1vbmRzXzAyLnBuZw=="/>'><a href='Baralho/card_diamonds_02.png'><img src='Baralho/index.html@i=image'/> card_diamonds_02.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>254B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtNS5wbmc="/>'><a href='Baralho/spades-5.png'><img src='Baralho/index.html@i=image'/> spades-5.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.81KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMDEucG5n"/>'><a href='Baralho/001.png'><img src='Baralho/index.html@i=image'/> 001.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>24.19KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtMy5wbmc="/>'><a href='Baralho/spades-3.png'><img src='Baralho/index.html@i=image'/> spades-3.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.49KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtMS5wbmc="/>'><a href='Baralho/hearts-1.png'><img src='Baralho/index.html@i=image'/> hearts-1.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>5.72KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX3NwYWRlc19BLnBuZw=="/>'><a href='Baralho/card_spades_A.png'><img src='Baralho/index.html@i=image'/> card_spades_A.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>219B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIEEucG5n"/>'><a href='Baralho/Large&#32;Card_Clubs&#32;A.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs A.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>244B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMTYucG5n"/>'><a href='Baralho/016.png'><img src='Baralho/index.html@i=image'/> 016.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>15.26KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkczcucG5n"/>'><a href='Baralho/cards7.png'><img src='Baralho/index.html@i=image'/> cards7.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>57.37KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNDkucG5n"/>'><a href='Baralho/049.png'><img src='Baralho/index.html@i=image'/> 049.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>119.82KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wNTAucG5n"/>'><a href='Baralho/050.png'><img src='Baralho/index.html@i=image'/> 050.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>115.45KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMjMucG5n"/>'><a href='Baralho/023.png'><img src='Baralho/index.html@i=image'/> 023.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>120.49KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkczMucG5n"/>'><a href='Baralho/cards3.png'><img src='Baralho/index.html@i=image'/> cards3.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>77.74KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMzIucG5n"/>'><a href='Baralho/032.png'><img src='Baralho/index.html@i=image'/> 032.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>42.8KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMTUucG5n"/>'><a href='Baralho/015.png'><img src='Baralho/index.html@i=image'/> 015.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>13.25KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtNC5wbmc="/>'><a href='Baralho/spades-4.png'><img src='Baralho/index.html@i=image'/> spades-4.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.54KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX2RpYW1vbmRzX0EucG5n"/>'><a href='Baralho/card_diamonds_A.png'><img src='Baralho/index.html@i=image'/> card_diamonds_A.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>235B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyAwMi5wbmc="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;02.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts 02.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>286B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy04LnBuZw=="/>'><a href='Baralho/diamonds-8.png'><img src='Baralho/index.html@i=image'/> diamonds-8.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>9.48KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyAwNi5wbmc="/>'><a href='Baralho/Large&#32;Card_Spades&#32;06.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades 06.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>276B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIEsucG5n"/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;K.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds K.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>379B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX2NsdWJzX0EucG5n"/>'><a href='Baralho/card_clubs_A.png'><img src='Baralho/index.html@i=image'/> card_clubs_A.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>218B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIFEucG5n"/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;Q.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds Q.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>371B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIDEwLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Clubs&#32;10.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs 10.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>305B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9zcGFkZXMtOS5wbmc="/>'><a href='Baralho/spades-9.png'><img src='Baralho/index.html@i=image'/> spades-9.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.88KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9kaWFtb25kcy0yLnBuZw=="/>'><a href='Baralho/diamonds-2.png'><img src='Baralho/index.html@i=image'/> diamonds-2.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>5.29KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0hlYXJ0cyBLLnBuZw=="/>'><a href='Baralho/Large&#32;Card_Hearts&#32;K.png'><img src='Baralho/index.html@i=image'/> Large Card_Hearts K.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>395B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy00LnBuZw=="/>'><a href='Baralho/clubs-4.png'><img src='Baralho/index.html@i=image'/> clubs-4.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.46KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMDUucG5n"/>'><a href='Baralho/005.png'><img src='Baralho/index.html@i=image'/> 005.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>47.01KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0RpYW1vbmRzIEEucG5n"/>'><a href='Baralho/Large&#32;Card_Diamonds&#32;A.png'><img src='Baralho/index.html@i=image'/> Large Card_Diamonds A.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>254B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy0xMi5wbmc="/>'><a href='Baralho/clubs-12.png'><img src='Baralho/index.html@i=image'/> clubs-12.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>12.23KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0NsdWJzIFEucG5n"/>'><a href='Baralho/Large&#32;Card_Clubs&#32;Q.png'><img src='Baralho/index.html@i=image'/> Large Card_Clubs Q.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>361B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkczgucG5n"/>'><a href='Baralho/cards8.png'><img src='Baralho/index.html@i=image'/> cards8.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>59.77KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1NwYWRlcyAwNC5wbmc="/>'><a href='Baralho/Large&#32;Card_Spades&#32;04.png'><img src='Baralho/index.html@i=image'/> Large Card_Spades 04.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>266B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX0JhY2sucG5n"/>'><a href='Baralho/Large&#32;Card_Back.png'><img src='Baralho/index.html@i=image'/> Large Card_Back.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>265B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMDgucG5n"/>'><a href='Baralho/008.png'><img src='Baralho/index.html@i=image'/> 008.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>63.35KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMzEucG5n"/>'><a href='Baralho/031.png'><img src='Baralho/index.html@i=image'/> 031.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>37.25KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9oZWFydHMtMi5wbmc="/>'><a href='Baralho/hearts-2.png'><img src='Baralho/index.html@i=image'/> hearts-2.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>5.86KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li8wMzcucG5n"/>'><a href='Baralho/037.png'><img src='Baralho/index.html@i=image'/> 037.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>125.67KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jYXJkX2hlYXJ0c19BLnBuZw=="/>'><a href='Baralho/card_hearts_A.png'><img src='Baralho/index.html@i=image'/> card_hearts_A.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>240B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9MYXJnZSBDYXJkX1JlZCBKb2tlci5wbmc="/>'><a href='Baralho/Large&#32;Card_Red&#32;Joker.png'><img src='Baralho/index.html@i=image'/> Large Card_Red Joker.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>338B</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9jbHVicy01LnBuZw=="/>'><a href='Baralho/clubs-5.png'><img src='Baralho/index.html@i=image'/> clubs-5.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.64KB</td>
+                                <td>2023-11-24 06:51:50</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

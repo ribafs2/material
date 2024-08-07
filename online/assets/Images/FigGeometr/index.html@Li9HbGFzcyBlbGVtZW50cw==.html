@@ -1,0 +1,780 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li9GaWdHZW9tZXRy.html'>Família Ferreira de Sousa</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMjYucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass026.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass026.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.32KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMzYucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass036.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass036.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.01KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMTIucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass012.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass012.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>959B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNDAucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass040.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass040.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.29KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMDgucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass008.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass008.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.23KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMzEucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass031.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass031.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>906B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMjkucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass029.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass029.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>813B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMjAucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass020.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass020.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.18KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNTIucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass052.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass052.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>4.97KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMjUucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass025.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass025.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.5KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMzIucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass032.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass032.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.01KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMzUucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass035.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass035.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>968B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMDUucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass005.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass005.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMzQucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass034.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass034.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>832B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMDMucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass003.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass003.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>537B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMTYucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass016.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass016.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.48KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNDUucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass045.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass045.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.88KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMTMucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass013.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass013.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.24KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMTEucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass011.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass011.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.96KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNTEucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass051.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass051.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>4.98KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNDQucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass044.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass044.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.36KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMDkucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass009.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass009.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>666B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMTAucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass010.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass010.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.06KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNDMucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass043.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass043.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.53KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNTMucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass053.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass053.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>4.18KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMDIucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass002.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass002.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.27KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNDEucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass041.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass041.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.38KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMDAucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass000.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass000.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>685B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMTkucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass019.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass019.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.77KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMTgucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass018.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass018.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.5KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNDYucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass046.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass046.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.99KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMjMucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass023.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass023.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.74KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/index.php'><img src='Glass&#32;elements/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-04-20 12:40:36</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNDIucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass042.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass042.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.12KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNDgucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass048.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass048.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.12KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMzAucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass030.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass030.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>852B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMTQucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass014.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass014.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.44KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMzgucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass038.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass038.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.11KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMjEucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass021.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass021.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.06KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNDkucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass049.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass049.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.71KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMzMucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass033.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass033.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.04KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMTcucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass017.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass017.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.62KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNTAucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass050.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass050.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.36KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMjIucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass022.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass022.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.52KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMjgucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass028.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass028.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>714B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMDQucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass004.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass004.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1000B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMDcucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass007.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass007.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.47KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMTUucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass015.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass015.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.16KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMjQucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass024.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass024.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.09KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNTQucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass054.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass054.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>6.13KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMzcucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass037.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass037.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>930B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMDYucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass006.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass006.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>800B</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMDEucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass001.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass001.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.36KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMjcucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass027.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass027.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.95KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwMzkucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass039.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass039.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.03KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9lbGVtZW50R2xhc3MwNDcucG5n"/>'><a href='http://backup/material/online/assets/Images/FigGeometr/Glass%20elements/elementGlass047.png'><img src='Glass&#32;elements/index.html@i=image'/> elementGlass047.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.96KB</td>
+                                <td>2023-11-24 06:51:52</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>
