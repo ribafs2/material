@@ -1,0 +1,429 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='http://backup/material/servidores/Seguranca/PHP/index.php?Lg=='>Index of /material/servidores/Seguranca/PHP/index.phpformularios_pt1/</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='formularios_pt1/radio.php.html'><img src='index.php@i=file'/> radio.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>115B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='formularios_pt1/hidden.php.html'><img src='index.php@i=file'/> hidden.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>98B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='formularios_pt1/texts.php.html'><img src='index.php@i=file'/> texts.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>133B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='formularios_pt1/select.html'><img src='index.php@i=file'/> select.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>709B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='formularios_pt1/checkbox.php.html'><img src='index.php@i=file'/> checkbox.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>561B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Check valid e-mail
+
+function esEmailValido($email)
+{
+    if (ereg(&quot;^[_a-zA-Z0-9-]+(\.[_a-zA-Z0-9-]+)*@([_a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]{2,200}\.[a-zA-Z]{2,6}$&quot;, $email ) )
+	{
+       return true;
+    }
+	else
+	{
+       return false;
+    }
+}
+Melhor &eacute; usa</pre>'><a href='formularios_pt1/TrabalhandoComValidacao_de_Dados.txt'><img src='index.php@i=text'/> TrabalhandoComValidacao_de_Dados.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.82KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='formularios_pt1/texts.html'><img src='index.php@i=file'/> texts.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>218B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='formularios_pt1/checkbox.html'><img src='index.php@i=file'/> checkbox.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>669B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='formularios_pt1/select.php.html'><img src='index.php@i=file'/> select.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>391B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&lt;h3&gt;Exemplo de uso de formulrio chamando outro script em PHP&lt;/h3&gt;
+
+&lt;body&gt;
+
+&lt;form name=&quot;form1&quot; method=&quot;POST&quot; action=&quot;forms0.php&quot;&gt;
+Nome.&lt;input type=&quot;text&quot; name=&quot;nome&quot; autofocus&gt;&lt;br&gt;
+E-mail&lt;input type=&quot;text&quot; name=&quot;email&quot;&gt;&lt;br&gt;
+&lt;input type=&quot;hidden</pre>'><a href='formularios_pt1/TrabalhandoComForms.txt'><img src='index.php@i=text'/> TrabalhandoComForms.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.5KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='formularios_pt1/FormsURLs.pdf'><img src='index.php@i=file'/> FormsURLs.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>564.64KB</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='formularios_pt1/hidden.html'><img src='index.php@i=file'/> hidden.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>174B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='formularios_pt1/radio.html'><img src='index.php@i=file'/> radio.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>556B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>**********************************
+Arquivos do artigo:
+
+&quot;Manipulando dados de formulrios com PHP - Parte 1.
+Por Alfred Reinold Baudisch - alfred@estacaonet.com
+Sbado, 24 de janeiro de 2004.&quot;
+
+Publicado no Linha de Cdigo: www.linhadecodigo.c</pre>'><a href='formularios_pt1/leia-me.txt'><img src='index.php@i=text'/> leia-me.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>433B</td>
+                                <td>2024-02-03 11:21:30</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

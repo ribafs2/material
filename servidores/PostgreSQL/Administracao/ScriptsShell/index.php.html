@@ -1,0 +1,969 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../../index.php@Li9BZG1pbmlzdHJhY2Fv.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre># Emiliano
+# C 2005 04 20
+# R 2005 08 12 [Adaptado par ao viva o linux]
+# Script para DUMP de bases PostGreSQL.
+# Sintaxe: pgbackup.sh [Nome da base]
+#
+# CONSTANTES ##################
+vU=&quot;postgres&quot;                 # Usuario no PostGreSQL
+vP=&quot;</pre>'><a href='pgbackup.sh'><img src='index.php@i=script'/> pgbackup.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>1.51KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estados.sql'><img src='index.php@i=file'/> estados.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.82KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='controle_estoque.sql'><img src='index.php@i=file'/> controle_estoque.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.45KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/bash
+#
+# Criado/adaptado por Ribamar FS - http://ribafs.org
+#
+#apt-get install dialog;
+#
+menu=&quot;Menu Principal\n\nUse as setas do teclado ou o mouse para selecionar uma op&ccedil;&atilde;o\nEnt&atilde;o tecle Enter ou clique em OK&quot;
+while :
+ do
+    clear
+	servico</pre>'><a href='devel.sh'><img src='index.php@i=script'/> devel.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>3.78KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='populate.sql'><img src='index.php@i=file'/> populate.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>121.15KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/bash
+#
+# Criado/adaptado por Ribamar FS - http://ribafs.org
+#
+#apt-get install dialog;
+#
+menu=&quot;DNOCS&quot;
+while :
+ do
+    clear
+	servico=$(dialog --stdout --backtitle &#039;Equipe de TI do DNOCS - Administra&ccedil;&atilde;o dos Servidores&#039; \
+        --menu &quot;$menu</pre>'><a href='admin.sh'><img src='index.php@i=script'/> admin.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>3.44KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='brasil_municipios_pg.sql'><img src='index.php@i=file'/> brasil_municipios_pg.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>575.78KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='syscat.sql'><img src='index.php@i=file'/> syscat.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.67KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='TeoriaDosConjutos.sql'><img src='index.php@i=file'/> TeoriaDosConjutos.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.76KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='cep_brasil_unique_utf8.csv'><img src='index.php@i=file'/> cep_brasil_unique_utf8.csv</a></td>
+                                                
+                                <td>File</td>
+                                <td>36MB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='brasil_municipios_mysql.sql'><img src='index.php@i=file'/> brasil_municipios_mysql.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>574.81KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>--
+-- PostgreSQL database dump
+--
+--
+-- Name: accounts; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE accounts (
+    aid integer NOT NULL,
+    bid integer,
+    abalance integer,
+    filler character(84)
+);
+
+
+ALTER TABLE </pre>'><a href='contas_10milhoesRegs.txt'><img src='index.php@i=text'/> contas_10milhoesRegs.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>505B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='menubox.html'><img src='index.php@i=file'/> menubox</a></td>
+                                                
+                                <td>File</td>
+                                <td>984B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='video_locadora_dados.sql'><img src='index.php@i=file'/> video_locadora_dados.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>55.02KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Controle de Estoque
+
+Criar o esquema atual, impondo integridade referencial atravs dos devidos relacionamentos.
+
+Teremos o banco controle_estoque 
+
+Com as seguintes tabelas:
+
+clientes
+funcionarios
+produtos
+pedidos
+pedido_itens
+reposicoe</pre>'><a href='controle_estoque1.txt'><img src='index.php@i=text'/> controle_estoque1.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.15KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='postgresql.conf.linux.modelo.html'><img src='index.php@i=file'/> postgresql.conf.linux.modelo</a></td>
+                                                
+                                <td>File</td>
+                                <td>13.32KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='UsuariosGrupos.sql'><img src='index.php@i=file'/> UsuariosGrupos.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>916B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/servidores/PostgreSQL/Administracao/ScriptsShell/index.php?Li9CYWNrdXBSZXN0b3Jl'><img src='index.php@i=folder'/> BackupRestore</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:12:22</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Scripts &Uacute;teis
+
+Listar os 6 maiores arquivos do diret&oacute;rio atual
+
+du -k * | sort -nr | cut -f2 | xargs -d &quot;\n&quot; -x du -sh | head
+ou
+du -h | sort -nr | head -6
+
+
+Listar os arquivos modificados h&aacute; mais de 4 dias. 
+
+Procurar&aacute; em /var/log e gravar&aacute; a l</pre>'><a href='scripts_uteis.txt'><img src='index.php@i=text'/> scripts_uteis.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>537B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ce.sql'><img src='index.php@i=file'/> ce.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.22MB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/sh
+# Script de backup incremental para o SINDIFORT
+#http://www.hardware.com.br/tutoriais/backup2/
+
+#tar --newer-mtime=`date +%Y%m%d%H%M` -cf /home/ribafs/guardar/backup_`date +%Y%m%d_%H%M`.tar /home/ribafs/backup
+# &quot;-a&quot; (archive) faz com que t</pre>'><a href='backup_sindifort.sh'><img src='index.php@i=script'/> backup_sindifort.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>1.39KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Crie um banco chamado cep_brasil, com uma &uacute;nica tabela cep_tabela cuja estrutura
+deve ser:
+
+Observe que estamos criando a tabela sem chave prim&aacute;ria.
+
+Descompacte o arquivo cep_brasil_unique.csv.zip
+Mude as permiss&otilde;es do arquivo cep_brasil_unique.c</pre>'><a href='cep_brasil_estrutura.txt'><img src='index.php@i=text'/> cep_brasil_estrutura.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.2KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ExecSendMailPostgreSQL25042006.tar.gz'><img src='index.php@i=compressed'/> ExecSendMailPostgreSQL25042006.tar.gz</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>4.64KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='agregacao.sql'><img src='index.php@i=file'/> agregacao.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.44KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='CidadesEstadosBrasil.sql'><img src='index.php@i=file'/> CidadesEstadosBrasil.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>574.83KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pg_hba.conf.linux.modelo.html'><img src='index.php@i=file'/> pg_hba.conf.linux.modelo</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.32KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='cep.sql.zip'><img src='index.php@i=compressed'/> cep.sql.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>17.31MB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='MuitosParaMuitos.sql'><img src='index.php@i=file'/> MuitosParaMuitos.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>15.24KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='UsuariosGruposCriar.sql'><img src='index.php@i=file'/> UsuariosGruposCriar.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.07KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='menu_txt.html'><img src='index.php@i=file'/> menu_txt</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.07KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estados_municipios.sql'><img src='index.php@i=file'/> estados_municipios.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>581.26KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pg_hba.conf.winxp.modelo.html'><img src='index.php@i=file'/> pg_hba.conf.winxp.modelo</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.04KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='index.php.html'><img src='index.php@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='world.sql'><img src='index.php@i=file'/> world.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>388.02KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Crie um banco chamado cep_brasil, com uma &uacute;nica tabela cep_tabela cuja estrutura
+deve ser:
+
+Observe que estamos criando a tabela sem chave prim&aacute;ria.
+
+Descompacte o arquivo cep_brasil_unique.csv.zip
+Mude as permiss&otilde;es do arquivo cep_brasil_unique.c</pre>'><a href='cep_brasil.txt'><img src='index.php@i=text'/> cep_brasil.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.2KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estadospg.sql'><img src='index.php@i=file'/> estadospg.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.98KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/servidores/PostgreSQL/Administracao/ScriptsShell/index.php?Li9PdXRyb3M='><img src='index.php@i=folder'/> Outros</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:12:30</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>echo -n &quot;Digite o diretrio onde descompactou o PostgreSQL. Ex.: postgresql-8.2 &quot;
+read dir
+sudo apt-get install build-essential
+sudo apt-get install libreadline-dev
+sudo apt-get install zlib1g-dev
+sudo apt-get install gettext
+
+cd /usr/local/sr</pre>'><a href='pg_install_ubuntu.sh'><img src='index.php@i=script'/> pg_install_ubuntu.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>773B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='cidades.zip'><img src='index.php@i=compressed'/> cidades.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>83.88KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='populate.pl'><img src='index.php@i=file'/> populate.pl</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.13KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='SchemaMichelaFuncViewTrig.sql'><img src='index.php@i=file'/> SchemaMichelaFuncViewTrig.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>40.56KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='contas_10milhoesRegs.rar'><img src='index.php@i=compressed'/> contas_10milhoesRegs.rar</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>11.38MB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='UsuariosGruposApagar.sql'><img src='index.php@i=file'/> UsuariosGruposApagar.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>428B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='postgresql.conf.winxp.modelo.html'><img src='index.php@i=file'/> postgresql.conf.winxp.modelo</a></td>
+                                                
+                                <td>File</td>
+                                <td>13.89KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Agrupamento.sql'><img src='index.php@i=file'/> Agrupamento.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.44KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>000   BRASIL                                  
+001   AFRICA DO SUL                           
+002   ANGOLA                                  
+003   ARGELIA                                 
+004   BENIN                                   
+005   BOTSUANA </pre>'><a href='PaisesImportacao.TXT'><img src='index.php@i=text'/> PaisesImportacao.TXT</a></td>
+                                                
+                                <td>Text</td>
+                                <td>8.86KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='contas_10milhoes_est.sql'><img src='index.php@i=file'/> contas_10milhoes_est.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>505B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pg_herana.sql'><img src='index.php@i=file'/> pg_herana.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.91KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>kdialog --title &quot;DNOCS - Formatacao de Pendrive - Ribamar FS&quot; --msgbox &quot;Espete o pendrive numa porta USB e tecle Enter.&quot;
+nome=`kdialog --title &quot;DNOCS - Formatacao de Pendrive&quot; --inputbox &quot;Digite um nome para o pendrive&quot;`
+kdialog --title &quot;DNOCS - Form</pre>'><a href='formatar_pd.sh'><img src='index.php@i=script'/> formatar_pd.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>520B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>-- 
+CREATE TABLE pessoas(
+			id SERIAL PRIMARY KEY,
+			nome VARCHAR(30),
+			endereco VARCHAR(80)
+);
+--
+CREATE TABLE pf(
+			cpf VARCHAR(14),
+			rc VARCHAR(20)
+)INHERITS (pessoas) ;
+-- inserindo pessoas
+INSERT INTO pessoas(nome, endereco) V</pre>'><a href='heranca.txt'><img src='index.php@i=text'/> heranca.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1007B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='TestarBancoeFuncoes.sql'><img src='index.php@i=file'/> TestarBancoeFuncoes.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>101.4KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='controle_estoquecake.sql'><img src='index.php@i=file'/> controle_estoquecake.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.29KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/servidores/PostgreSQL/Administracao/ScriptsShell/index.php?Li9wbHBnc3FsX1RhYmVsYXM='><img src='index.php@i=folder'/> plpgsql_Tabelas</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 12:24:32</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='municipios.sql'><img src='index.php@i=file'/> municipios.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>575.79KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pessoa.sql'><img src='index.php@i=file'/> pessoa.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>11.16KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='video_locadora.sql'><img src='index.php@i=file'/> video_locadora.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.01KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pg_heranÃÂÃÂ§a.sql'><img src='index.php@i=file'/> pg_heranÃÂÃÂ§a.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.91KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='veiculos.sql'><img src='index.php@i=file'/> veiculos.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.37MB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/sh
+# backupBd.sh - Efetua backup do banco de dados MySQL ou PostgreSQL.
+#
+# Homepage   : http://neto.gsibr.com/scripts
+# Autor      : Jos Morelli Neto &lt;neto@univali.br&gt;
+#
+# ---------------------------------------------------------------------</pre>'><a href='backupBd.sh'><img src='index.php@i=script'/> backupBd.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>8.78KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>echo -n &quot;Digite o diretrio onde descompactou o PostgreSQL. Ex.: postgresql-8.2 &quot;
+read dir
+
+cd /usr/local/src/$dir
+./configure
+gmake
+gmake install
+groupadd postgres
+useradd -g postgres -d /usr/local/pgsql postgres
+mkdir /usr/local/pgsql/data</pre>'><a href='pg_install_slack.sh'><img src='index.php@i=script'/> pg_install_slack.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>591B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='sistema_todas_cidades.zip'><img src='index.php@i=compressed'/> sistema_todas_cidades.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>88.05KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='style.class.php.html'><img src='index.php@i=file'/> style.class.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.22KB</td>
+                                <td>2024-01-31 08:47:00</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='gera_base_dados_mundial-cidades.zip'><img src='index.php@i=compressed'/> gera_base_dados_mundial-cidades.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>5.49KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

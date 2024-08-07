@@ -1,0 +1,487 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='index.html@Lg==.html'>Index of /material/servidores/PostgreSQL/Monitoramento/explain_arquivos/</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X21hdGVyaWFsaXplLnBuZw=="/>'><a href='explain_arquivos/ex_materialize.png'><img src='index.html@i=image'/> ex_materialize.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.22KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X3N1YnBsYW4ucG5n"/>'><a href='explain_arquivos/ex_subplan.png'><img src='index.html@i=image'/> ex_subplan.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.02KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X2FwcGVuZC5wbmc="/>'><a href='explain_arquivos/ex_append.png'><img src='index.html@i=image'/> ex_append.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.08KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X3NvcnQucG5n"/>'><a href='explain_arquivos/ex_sort.png'><img src='index.html@i=image'/> ex_sort.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.99KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X2dyb3VwLnBuZw=="/>'><a href='explain_arquivos/ex_group.png'><img src='index.html@i=image'/> ex_group.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.59KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X3NldG9wLnBuZw=="/>'><a href='explain_arquivos/ex_setop.png'><img src='index.html@i=image'/> ex_setop.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.49KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X3NlZWsucG5n"/>'><a href='explain_arquivos/ex_seek.png'><img src='index.html@i=image'/> ex_seek.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.7KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>(function(){
+function m(b){return b!=null?&#039;&quot;&#039;+b+&#039;&quot;&#039;:&#039;&quot;&quot;&#039;}
+function B(b){if(typeof encodeURIComponent==&quot;function&quot;){return encodeURIComponent(b)}else{return escape(b)}}
+function c(b,a){if(a){window.google_ad_url+=&quot;&amp;&quot;+b+&quot;=&quot;+a}}
+function f(b,a){if(a){c(b</pre>'><a href='explain_arquivos/show_ads.js'><img src='index.html@i=javascript'/> show_ads.js</a></td>
+                                                
+                                <td>Javascript</td>
+                                <td>6.92KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X2luZGV4X3NjYW4ucG5n"/>'><a href='explain_arquivos/ex_index_scan.png'><img src='index.html@i=image'/> ex_index_scan.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.36KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X2JtcF9oZWFwLnBuZw=="/>'><a href='explain_arquivos/ex_bmp_heap.png'><img src='index.html@i=image'/> ex_bmp_heap.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.44KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X21lcmdlLnBuZw=="/>'><a href='explain_arquivos/ex_merge.png'><img src='index.html@i=image'/> ex_merge.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.96KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X3VuaXF1ZS5wbmc="/>'><a href='explain_arquivos/ex_unique.png'><img src='index.html@i=image'/> ex_unique.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.75KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X2xpbWl0LnBuZw=="/>'><a href='explain_arquivos/ex_limit.png'><img src='index.html@i=image'/> ex_limit.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.2KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X3NjYW4ucG5n"/>'><a href='explain_arquivos/ex_scan.png'><img src='index.html@i=image'/> ex_scan.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>1.88KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X3Jlc3VsdC5wbmc="/>'><a href='explain_arquivos/ex_result.png'><img src='index.html@i=image'/> ex_result.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>3.13KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X2hhc2gucG5n"/>'><a href='explain_arquivos/ex_hash.png'><img src='index.html@i=image'/> ex_hash.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.38KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X2JtcF9pbmRleC5wbmc="/>'><a href='explain_arquivos/ex_bmp_index.png'><img src='index.html@i=image'/> ex_bmp_index.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.63KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X3RpZF9zY2FuLnBuZw=="/>'><a href='explain_arquivos/ex_tid_scan.png'><img src='index.html@i=image'/> ex_tid_scan.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.25KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X3Vua25vd24ucG5n"/>'><a href='explain_arquivos/ex_unknown.png'><img src='index.html@i=image'/> ex_unknown.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.15KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X2pvaW4ucG5n"/>'><a href='explain_arquivos/ex_join.png'><img src='index.html@i=image'/> ex_join.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.11KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X2FnZ3JlZ2F0ZS5wbmc="/>'><a href='explain_arquivos/ex_aggregate.png'><img src='index.html@i=image'/> ex_aggregate.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.04KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='explain_arquivos/ads.html'><img src='index.html@i=file'/> ads.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.62KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                        
+                                <td class='has_popover' title='Thumbnail' data-content='<img src="?t=Li9leHBsYWluX2FycXVpdm9zL2V4X25lc3RlZC5wbmc="/>'><a href='explain_arquivos/ex_nested.png'><img src='index.html@i=image'/> ex_nested.png</a></td>
+                                                
+                                <td>Picture</td>
+                                <td>2.18KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

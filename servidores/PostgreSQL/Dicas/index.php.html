@@ -1,0 +1,1867 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../../../index.php@Li9zZXJ2aWRvcmVzL1Bvc3RncmVTUUw=.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Uso do iconv
+
+No Windows
+
+iconv -c -s -f iso-8859-1 -t cp1252 cep_brasil_unique.csv &gt; cep_brasil_unique_1252.csv
+
+iconv -c -s -f iso-8859-1 -t utf-8 cep_brasil_unique.csv &gt; cep_brasil_unique_utf8.csv
+
+
+Variveis de Ambiente no Windows XP
+
+Criando no </pre>'><a href='dicaswindows.txt'><img src='index.php@i=text'/> dicaswindows.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>596B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>						INSERT &ndash; Inserir registros em tabelas.
+
+banco=# \h insert
+
+Comando: INSERT
+Descri&ccedil;&atilde;o: insere novos registros em uma tabela
+
+Sintaxe:
+INSERT INTO tabela [ ( lista_de_campos ) ]
+{ DEFAULT VALUES | VALUES ( { express&atilde;o | DEFAULT } [, ...] ) |</pre>'><a href='insert.txt'><img src='index.php@i=text'/> insert.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.12KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='postgresql83_psql_cheatsheet.pdf'><img src='index.php@i=file'/> postgresql83_psql_cheatsheet.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>115.05KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Consultas_join.pdf'><img src='index.php@i=file'/> Consultas_join.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>28.41KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>mkdir /home/ribafs/data_latin1
+su &ndash; postgres
+export LANG=pt_BR.ISO-8859-1
+
+/usr/lib/postgresql/8.3/bin/initdb &ndash;encoding latin1 -D /home/ribafs/data_latin1/
+Editar o script data_latin1/postgresql.conf e alterar a porta para 5433
+
+Conectando no clu</pre>'><a href='pglatin1.txt'><img src='index.php@i=text'/> pglatin1.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>935B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estados.sql'><img src='index.php@i=file'/> estados.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.66KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+Pesquisar um mes dentro de uma data.  Exemplo, eu quero pesquisar todos os pessoas
+que fazem anivesario no mes de abril, pesquisando pela data de nascimento
+
+SELECT * FROM pessoas WHERE data_nasc &lt;= &#039;mm/dd/yyyy&#039; AND data_nasc &gt;=
+&#039;mm/dd/yyyy&#039;
+Emerson</pre>'><a href='Diversas.txt'><img src='index.php@i=text'/> Diversas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.61KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Estas dicas foram coletadas em sua grande maioria da lista de PostgreSQL https://listas.postgresql.org.br/cgi-bin/mailman/listinfo/pgbr-geral
+
+Dicas teis Diversas para uso com qualquer SGBDs em geral e boa parte exclusivas para o PostgreSQL
+
+
+Quase </pre>'><a href='DicasUteisDiversas.txt'><img src='index.php@i=text'/> DicasUteisDiversas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>34.08KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pg_Dicas[1].odt'><img src='index.php@i=file'/> pg_Dicas[1].odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>39.35KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='usuario.sql'><img src='index.php@i=file'/> usuario.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>37.79KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='RedesIntro.odt'><img src='index.php@i=file'/> RedesIntro.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>263.92KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='permissoesXesquemas.zip'><img src='index.php@i=compressed'/> permissoesXesquemas.zip</a></td>
+                                                
+                                <td>Archive</td>
+                                <td>9.58KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>pg_live
+andlinux - totalmente integrado ao sistema operacional, usando as configuraes locais, de
+hardware,etc. Aceitando copiar e colar entre os aplicativos windows e linux, etc.
+
+sysstat
+
+-------------
+
+&gt;   Vocs conhecer alguma ferramenta</pre>'><a href='Ferramentas.txt'><img src='index.php@i=text'/> Ferramentas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>827B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='PostgreSQL_Links.html'><img src='index.php@i=file'/> PostgreSQL_Links.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>130.86KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>																			Update &ndash; Atualizando Registros
+
+Exemplos:
+
+UPDATE clientes SET idade = idade + 1; -- Todos os registros de clientes ser&atilde;o atualizados
+
+UPDATE pedidos SET quant = quant + 3
+WHERE cliente IN (SELECT codigo FROM clientes WHERE idad</pre>'><a href='update.txt'><img src='index.php@i=text'/> update.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>261B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#---------------------------------------------------------------------------#
+#	Membro ................. backupPostgreSQL.sh			    #
+#       Autor ...................Paulo Roberto Leite Nunes                  #
+#				 Luiz Gonzaga da Mata             </pre>'><a href='backuppostgreSQL.sh'><img src='index.php@i=script'/> backuppostgreSQL.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>4.56KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Mudando a Codifica&ccedil;&atilde;o de Caracteres do PostgreSQL para URF8
+
+Initiate Postgresql
+
+$ sudo service postgresql start
+
+$ sudo sudo -u postgres psql
+
+postgres=# CREATE USER username SUPERUSER PASSWORD &#039;password&#039;;
+
+postgres=# \q
+
+Update templ</pre>'><a href='Mudando&#32;a&#32;CodificaÃÂÃÂ§ÃÂÃÂ£o&#32;de&#32;Caracteres&#32;do&#32;PostgreSQL.txt'><img src='index.php@i=text'/> Mudando a CodificaÃÂÃÂ§ÃÂÃÂ£o de Caracteres do PostgreSQL.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>773B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='faqs.FAQ.html'><img src='index.php@i=file'/> faqs.FAQ.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>52.76KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='PostgreSQL&#32;Cheat&#32;Sheet.htm'><img src='index.php@i=file'/> PostgreSQL Cheat Sheet.htm</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.96KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pg_tratamento_erros.odt'><img src='index.php@i=file'/> pg_tratamento_erros.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>39.72KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Tipos Geomtricos:
+
+CREATE TABLE geometricos(ponto POINT, segmento LSEG, retangulo BOX, poligono POLYGON, circulo CIRCLE);
+
+ponto (0,0), 
+
+segmento de (0,0) at (0,1), 
+
+retngulo (base inferior (0,0) at (1,0) e base superior (0,1) at (1,1)) e crc</pre>'><a href='geometricos.txt'><img src='index.php@i=text'/> geometricos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>772B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>URL da fonte de dados:
+jdbc:postgresql://127.0.0.1:5432/testes
+
+Classe do driver JDBC:
+org.postgresql.Driver
+postgresql://127.0.0.1/testes?charSet=LATIN1
+
+Nome do usu&aacute;rio - postgres
+password required
+
+Concluir
+Digitar um nome para o banco do OOBase
+</pre>'><a href='jdbcdriverdicas.txt'><img src='index.php@i=text'/> jdbcdriverdicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>250B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>pg_dumpall salva os bancos de dados de um agrupamento do PostgreSQL em um arquivo de script.
+
+Uso:
+  pg_dumpall [OPO]...
+
+Opes gerais:
+  -f, --file=ARQUIVO       nome do arquivo de sada
+  -i, --ignore-version     prossegue mesmo se a vers</pre>'><a href='pg_dumpall_opcoes.txt'><img src='index.php@i=text'/> pg_dumpall_opcoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.26KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>DTL e DQL
+
+DTL - Linguagem de Transao de Dados
+
+    * BEGIN WORK (ou START TRANSACTION, dependendo do dialeto SQL) pode ser usado para marcar o comeo de uma transao de banco de dados que pode ser completada ou no.
+
+    * COMMIT envia todo</pre>'><a href='DTL&#32;e&#32;DQL.txt'><img src='index.php@i=text'/> DTL e DQL.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.49KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Atravs do pg_hba.conf
+
+
+
+Atravs do postgresql.conf
+
+
+
+Atravs do SQL
+
+Ajustando o formato da Data do Sistema
+
+SHOW DATESTYLE;
+SET DATESTYLE TO ISO;	YYYY-MM-DD HH:MM:SS
+SET DATESTYLE TO PostgreSQL;	Formato tradicional do PostgreSQL (
+SET DATESTYLE T</pre>'><a href='configuracoes.txt'><img src='index.php@i=text'/> configuracoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1005B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>					Criando e Usando uma View
+
+Uma view  uma consulta armazenada no banco.
+
+Criar uma view que trabalhe na tabela clientes do esquema clientea (datas no estilo dmy).
+
+CREATE VIEW v_clientes_aniversariantes AS
+SELECT nome, data_nascimento
+FROM clien</pre>'><a href='views.txt'><img src='index.php@i=text'/> views.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.03KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>M&aacute;quina virtual simples de instalar e com suporte a Windows, Linux, Mac e outros.
+
+Ap&oacute;s instalar j&aacute; conecta a Internet sem nenhuma configura&ccedil;&atilde;o adicional.
+
+Site - http://www.virtualbox.org
+</pre>'><a href='virtualbox.txt'><img src='index.php@i=text'/> virtualbox.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>194B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='PostgreSQLCheat&#32;Sheet.odt'><img src='index.php@i=file'/> PostgreSQLCheat Sheet.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.05KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>O SELECT abaixo mostra os objetos que precisam de vacuum.
+(Dica: crie uma view para ele)
+
+SELECT pg_namespace.nspname, pg_class.relname, pg_class.reltuples,
+pg_class.relpages, rowwidths.avgwidth,
+      ceil(pg_class.reltuples * rowwidths.avgwidt</pre>'><a href='Extras.txt'><img src='index.php@i=text'/> Extras.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.05KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>																		OPERADOR NULL
+
+Em SQL NULL &eacute; para valores inexistentes. Regra geral: NULL se propaga, o que
+significa que com quem NULL se combina o resultado ser&aacute; um NULL.
+NULL n&atilde;o zero, n&atilde;o &eacute; string vazia nem string de comprimento zero. 
+Um </pre>'><a href='null.txt'><img src='index.php@i=text'/> null.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.78KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Alguem sabe como fao no postgres para pegar a quantidade de meses entre duas datas?
+No oracle existia esta function, alguem sabe se no postgres existe algo parecido?
+
+Ai vai uma soluo.
+
+select extract(&#039;month&#039; from age(&#039;2008-05-05&#039;,&#039;2008-03-19&#039;));
+</pre>'><a href='Dicas.txt'><img src='index.php@i=text'/> Dicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>12.16KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='totalreg_umbanco.php.html'><img src='index.php@i=file'/> totalreg_umbanco.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>864B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>/*
+Uso do iconv - Convertendo Codificaes
+
+Caso queira converter entre vrios tipos de codificao, o iconv  uma boa sada.
+O Linux j vem com ele.
+O Windows tambm conta com uma verso, aqui - http://gnuwin32.sourceforge.net/packages/libiconv</pre>'><a href='Diversos.txt'><img src='index.php@i=text'/> Diversos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>745B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='estrangeira.sql'><img src='index.php@i=file'/> estrangeira.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.99KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Criar Novo Servio no Windows XP
+
+Applications as Services Utility (srvany.exe) e Service Installer (instsrv.exe). Essa ferramentas fazem parte do Windows Server 2003 Resource Kit Tools:
+http://www.microsoft.com/downloads/details.aspx?FamilyID=9d4</pre>'><a href='criar_remover_servico_windowsxp.txt'><img src='index.php@i=text'/> criar_remover_servico_windowsxp.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.66KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Instalar Mdulos do PERL
+
+ perl -MCPAN -e shell
+
+Una vez en el shell de CPAN solo tenes que decirle que instale el DBI
+
+CPAN&gt; install DBI 
+</pre>'><a href='dicas_perl.txt'><img src='index.php@i=text'/> dicas_perl.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>139B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='trigger.sql'><img src='index.php@i=file'/> trigger.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.12KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='horarioverao_timezones.html'><img src='index.php@i=file'/> horarioverao_timezones.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>23.01KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>This is psql 8.3.1, the PostgreSQL interactive terminal.
+
+Usage:
+  psql [OPTIONS]... [DBNAME [USERNAME]]
+
+General options:
+  -d DBNAME       specify database name to connect to (default: &quot;ribafs&quot;)
+  -c COMMAND      run only single command (SQL</pre>'><a href='psql_opcoes.txt'><img src='index.php@i=text'/> psql_opcoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.24KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Como Localizar e Deletar registros duplicados 
+
+1.Select para localizar duplicados
+    select campo,campo1,count(*)
+     from tabela having count(*) &gt; 1
+    group by campo,campo1
+
+  2.Como deletar duplicados
+   delete from tab p1
+   where ro</pre>'><a href='Como&#32;Localizar&#32;e&#32;Deletar&#32;registros&#32;duplicados.txt'><img src='index.php@i=text'/> Como Localizar e Deletar registros duplicados.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>7.63KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='sql1.sql'><img src='index.php@i=file'/> sql1.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>199B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='usuario-teste.sql'><img src='index.php@i=file'/> usuario-teste.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>21.08KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='funcoes.sql'><img src='index.php@i=file'/> funcoes.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>10.82KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Gera&ccedil;&atilde;o de Hist&oacute;rico Autom&aacute;tico em Bancos de Dados PostgreSQL
+Por Mauro Henrique Costa Matos
+Abril de 2005
+
+Para ver a acentua&ccedil;&atilde;o utilize codifica&ccedil;&atilde;o UTF-8.
+
+
+1 - Introdu&ccedil;&atilde;o
+2 - Hist&oacute;rico
+3 - Conte&uacute;do dos Arquivos
+4 - Instala&ccedil;&atilde;o
+5 - Uso</pre>'><a href='historico_4.txt'><img src='index.php@i=text'/> historico_4.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>5.96KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='exercicios.doc'><img src='index.php@i=file'/> exercicios.doc</a></td>
+                                                
+                                <td>File</td>
+                                <td>152KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Constraints.pdf'><img src='index.php@i=file'/> Constraints.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>43.95KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Alexsander,
+
+Bom, talvez uma segunda opinio te ajude.
+Comentrios abaixo.
+
+&gt; From: &quot;Alexsander Rosa&quot; &lt;alexsander.rosa@gmail.com&gt;
+&gt; Subject: Re: [pgbr-geral] 2 cadastros em uma tabela
+&gt; To: &quot;Comunidade PostgreSQL Brasileira&quot;
+&gt;
+&gt; O que  uma tabela &quot;c</pre>'><a href='desnormalizacao.txt'><img src='index.php@i=text'/> desnormalizacao.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.56KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='historico_4s01.sql'><img src='index.php@i=file'/> historico_4s01.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>17.22KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Quando Servidor n&atilde;o sobe dando falha e n&atilde;o starta:
+
+Remover o postmaster.pid da pasta data.
+</pre>'><a href='dicas4.txt'><img src='index.php@i=text'/> dicas4.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>94B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Instalar Mdulos do PERL
+
+ perl -MCPAN -e shell
+
+Una vez en el shell de CPAN solo tenes que decirle que instale el DBI
+
+CPAN&gt; install DBI 
+</pre>'><a href='dicas_linux.txt'><img src='index.php@i=text'/> dicas_linux.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>139B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='historico_plpgsql.sql'><img src='index.php@i=file'/> historico_plpgsql.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>551B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>PostgreSQL - Backup e Restore
+
+Gerar backup de um banco:
+pg_dump -U postgres nomebanco &gt; nomebanco.sql
+
+Restaurar o backup do banco num banco recem-criado:
+psql -U postgres -d nomebanco -f novobanco.sql
+
+Restaurar backup de um servidor para outro (re</pre>'><a href='pg_backup_restore.txt'><img src='index.php@i=text'/> pg_backup_restore.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.62KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>pg_live
+
+Live CD com XUbuntu contendo o PostgreSQL 8.3, PGAdmin 1.82, phpPgAdmin 1.4.3 e mutias outras ferramentas
+pr&eacute;-instaladas.
+
+Muito &uacute;til para o DBA que trabalha com o PostgreSQL ou est&aacute; aprendendo.
+
+Site - http://205.237.195.102/
+</pre>'><a href='pg_live.txt'><img src='index.php@i=text'/> pg_live.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>239B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>																		Criar e Remover ndices
+
+
+Criar um ndice
+
+CREATE INDEX nomeindice ON tabela (campo);
+
+
+Remover ndice:
+
+DROP INDEX nomeindice;
+
+Criar um ndice nico:
+
+CREATE UNIQUE INDEX nomeindice ON tabela (campo);
+
+Obs.: Somente os ndices tip</pre>'><a href='indices.txt'><img src='index.php@i=text'/> indices.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.35KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='disable_uac_in_windows_vista.htm'><img src='index.php@i=file'/> disable_uac_in_windows_vista.htm</a></td>
+                                                
+                                <td>File</td>
+                                <td>63.41KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>SHOW
+
+Diversos comandos e configuraes podem ser monitoradas com o comando SHOW.
+ uma extenso do PostgreSQL muito til ao administrador.
+
+Deve ser executado com um parmetro de cada vez.
+No permite o uso combinado com comandos SQL.
+
+Sintaxe:
+
+SHO</pre>'><a href='ComandosSetResetShoweOutros.txt'><img src='index.php@i=text'/> ComandosSetResetShoweOutros.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.03KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Encontrar registros duplicados
+
+Quando a chave &eacute; o emp_cnpj
+
+SELECT
+    emp_cnpj,
+    count(*)
+FROM empresa
+WHERE
+   emp_cnpj &lt;&gt; &#039;&#039;
+GROUP BY emp_cnpj
+HAVING COUNT(*) &gt; 1
+
+
+Se n&atilde;o importar qual das duplicatas ir&aacute; permanecer voc&ecirc; pode usar:
+
+CREATE</pre>'><a href='encontrar_duplicados.txt'><img src='index.php@i=text'/> encontrar_duplicados.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.49KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='keyboard&#32;shortcuts&#32;in&#32;psql.htm'><img src='index.php@i=file'/> keyboard shortcuts in psql.htm</a></td>
+                                                
+                                <td>File</td>
+                                <td>19.37KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>/*
+O problema  usar herana.  Pode procurar o histrico da lista, isso
+j deu discusso de montes, mas o resumo : herana foi uma m idia
+que no vai embora porque acabou sendo usada para implementar alguns
+buracos como particionamento de tabe</pre>'><a href='Heranca.txt'><img src='index.php@i=text'/> Heranca.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.7KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>																		Usando CASE WHEN
+
+   * SELECT CASE WHEN [teste] THEN ... ELSE [saida] END;
+ou
+    * SELECT CASE [coluna]
+          o WHEN [valor1] THEN
+          o WHEN [valor2] THEN
+          o ...
+          o ELSE [saida] END
+
+   Quando o teste </pre>'><a href='case_when.txt'><img src='index.php@i=text'/> case_when.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.21KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ListaUsuariosAcesso.doc'><img src='index.php@i=file'/> ListaUsuariosAcesso.doc</a></td>
+                                                
+                                <td>File</td>
+                                <td>98KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>													Consultas usando SELECT
+
+CL&Aacute;USULA WHERE - Filtra o retorno de consultas.
+
+Operadores aceitos:
+=, &gt;, &lt;, &lt;&gt;, !=, &gt;=, &lt;=
+
+SELECT nome FROM clientes WHERE email = &#039;ribafs@ribafs.net&#039;;
+SELECT nome FROM clientes WHERE idade &gt; 18;
+SELECT nome </pre>'><a href='select.txt'><img src='index.php@i=text'/> select.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.77KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>												Exerccios sobre Funes SQL
+
+Estes exerccios foram parte do treinamento para a empresa Computex.
+
+Funo em SQL
+
+Funo para debitar numa conta bancria:
+
+create database banco;
+\c banco
+create temp table conta(
+numero int not null prim</pre>'><a href='funcoes_sql.txt'><img src='index.php@i=text'/> funcoes_sql.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.55KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Gera&ccedil;&atilde;o de Hist&oacute;rico Autom&aacute;tico em Bancos de Dados PostgreSQL
+Por Mauro Henrique Costa Matos
+
+Esse texto foi escrito utilizando codifica&ccedil;&atilde;o UNICODE (UTF-8).
+
+SUM&Aacute;RIO
+-------
+
+1 - Introdu&ccedil;&atilde;o
+2 - Hist&oacute;rico
+3 - Conte&uacute;do dos Arquivos</pre>'><a href='historico.txt'><img src='index.php@i=text'/> historico.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>6.76KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='index.php.html'><img src='index.php@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='join.sql'><img src='index.php@i=file'/> join.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.52KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Objetos grandes no banco
+Vamos l:
+
+ importante voc saber que na verdade sua imagem no  armazenada na tabela que voc est especificando, nesta sua tabela  apenas criado um OID que faz referncia a tabela pg_largeobject que  onde verdadeirament</pre>'><a href='Dicas5.txt'><img src='index.php@i=text'/> Dicas5.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>7.48KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Dicas sobre o SGBD livres PostgreSQL
+
+CREATE DATABASE nomebanco;
+
+
+Scrips
+
+MySQL ou PostgreSQL (este script funciona nos dois)
+
+create table clientes
+(
+	cliente int primary key,
+	cpf char(11),
+	nome char(45) not null,
+	credito_liberado char(1) not nu</pre>'><a href='PostgreSQL_dicas.txt'><img src='index.php@i=text'/> PostgreSQL_dicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.03KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>&gt; Preciso fazer um select normal que me traga os dados de uma tabela,
+&gt; mas no campo titulo existem alguns registros que contem o titulo com
+&gt; quebra de linha no final. E na hora de fazer um select nesse registro
+&gt; estou tendo dificuldades...
+&gt;
+</pre>'><a href='campocomquebradelinha.txt'><img src='index.php@i=text'/> campocomquebradelinha.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>606B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Funes de Agregao (Agrupamento)
+
+max, min, sum, count, avg, stddev, variance
+
+max
+
+Trazendo o cpf do cliente que tem o maior bonus:
+select cpf_cliente, max(bonus) as maior from bonus group by cpf_cliente order by maior desc limit 1;
+Obs.: lembrar </pre>'><a href='Agrupamento0.txt'><img src='index.php@i=text'/> Agrupamento0.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.31KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='historico_4plpgsql.sql'><img src='index.php@i=file'/> historico_4plpgsql.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>545B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Links&#32;sobre&#32;o&#32;PostgreSQL.odt'><img src='index.php@i=file'/> Links sobre o PostgreSQL.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>28.41KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>																	Usando SubConsultas
+
+select nome, (select max(preco) from produtos where codigo=1) as &quot;maior preo&quot; from produtos;
+
+SELECT * FROM tabela1 WHERE tabela1.col1 =
+(SELECT col2 FROM tabela2 WHERE col2 = valor);
+
+SELECT name FROM customer </pre>'><a href='sub_consultas.txt'><img src='index.php@i=text'/> sub_consultas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.01KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Random_Aggregate.htm'><img src='index.php@i=file'/> Random_Aggregate.htm</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.77KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='PostgreSQL&#32;Cheat&#32;Sheet.odt'><img src='index.php@i=file'/> PostgreSQL Cheat Sheet.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>43.57KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>euler@harman:~$ time for i in `seq 1 1000`; do psql -c &quot;select 1&quot;
+1&gt;/dev/null 2&gt;&amp;1; done
+
+real    1m20.261s
+user    0m7.712s
+sys     0m3.252s</pre>'><a href='pg_Dicas2.txt'><img src='index.php@i=text'/> pg_Dicas2.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>146B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Logo ap&oacute;s a instala&ccedil;&atilde;o no Ubuntu:
+sudo passwd postgres
+su - postgre
+psql
+ALTER ROLE postgres WITH PASSWORD &#039;postgres&#039;;
+\q
+
+Adicionar Usu&aacute;rio
+
+CREATE ROLE usuario NOLOGIN PASSWORD &#039;senha&#039;
+
+Remover todos os privil&eacute;gios p&uacute;blicos em uma tabela:
+REV</pre>'><a href='pg_privilegios.txt'><img src='index.php@i=text'/> pg_privilegios.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>818B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pg_Dicas2.odt'><img src='index.php@i=file'/> pg_Dicas2.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>31.51KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Funes para Redes
+
+Funes cidr e inet 
+
+host(inet) - - host(&#039;192.168.1.5/24&#039;) - -  192.168.1.5
+masklen(inet) - - masklen(&#039;192.168.1.5/24&#039;) - - 24
+netmask(inet) - - netmask(&#039;192.168.1.5/24&#039;) - - 255.255.255.0
+network(inet) - - network(&#039;192.168.1.5/2</pre>'><a href='redes.txt'><img src='index.php@i=text'/> redes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>371B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Instalando e Usando o AndLinux no WindowsXP
+
+1) Fazer o Download de http://www.andlinux.org
+Existem duas verses, uma mais leve, para o ambiente grfico XFce
+e outra com o KDE.
+
+2) Antes de instalar crie uma pasta no XP e compartilhe da seguint</pre>'><a href='andlinux_tutorial.txt'><img src='index.php@i=text'/> andlinux_tutorial.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.36KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='postgresql-cheat-sheet.pdf'><img src='index.php@i=file'/> postgresql-cheat-sheet.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>104.64KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Veja, usar id aqui em vez do nome da outra equipe vai obrigar a fazer
+muitas jun&ccedil;&otilde;es.
+
+ O que importa &eacute; ter uma ou mais
+chaves.  Um campo seq&uuml;encial por defini&ccedil;&atilde;o &eacute; uma m&aacute; chave, porque
+permite duplicados; embora possa ser necess&aacute;rio em v&aacute;r</pre>'><a href='serial_ruimchaveprimaria.txt'><img src='index.php@i=text'/> serial_ruimchaveprimaria.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>913B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>euler@harman:~$ time for i in `seq 1 1000`; do psql -c &quot;select 1&quot;
+1&gt;/dev/null 2&gt;&amp;1; done
+
+real    1m20.261s
+user    0m7.712s
+sys     0m3.252s
+
+=================
+&gt; percebi que as tabelas &quot;pga_tmp_zombies&quot; estao com
+&gt; relfrozenxid altos eles n</pre>'><a href='pg_Dicas3.txt'><img src='index.php@i=text'/> pg_Dicas3.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>836B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='totalregistrostodosbds.php.html'><img src='index.php@i=file'/> totalregistrostodosbds.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.37KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='historico.sql'><img src='index.php@i=file'/> historico.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.49KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pg_dicas.odt'><img src='index.php@i=file'/> pg_dicas.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.24MB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+Consulta no prompt do SO:
+
+psql -U postgres -d banco -c &quot;SELECT * FROM clientes&quot; -o &quot;c:\arquivodesaida.txt&quot;
+
+</pre>'><a href='psql.txt'><img src='index.php@i=text'/> psql.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>115B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='PostgreSQL_CDTC.pdf'><img src='index.php@i=file'/> PostgreSQL_CDTC.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>155.21KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Roundcube
+
+banco - roundcubemail
+user - roundcube (dono do banco)
+
+
+Criar Usu&aacute;rio
+CREATE ROLE roundcube WITH LOGIN ENCRYPTED PASSWORD &#039;zmxn1029rc&#039;;
+
+CREATE ROLE admin WITH CREATEDB CREATEROLE;
+
+CREATE ROLE name [ WITH ADMIN rolename ]
+
+
+Criar Banco
+</pre>'><a href='pg_user_banco.txt'><img src='index.php@i=text'/> pg_user_banco.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.7KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Metacomandos do psql
+
+Geral
+  \c[onnect] [NOMEBD|- USURIO|- MQUINA|- PORTA|-]
+                 conecta a um outro banco de dados (atual &quot;dba_projeto&quot;)
+  \cd [DIRETRIO] muda o diretrio de trabalho atual
+  \copyright     mostra termos de uso e dist</pre>'><a href='psql_metacomandos.txt'><img src='index.php@i=text'/> psql_metacomandos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.93KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Encontrar registros duplicados
+
+Quando a chave &eacute; o emp_cnpj
+
+SELECT
+    emp_cnpj,
+    count(*)
+FROM empresa
+WHERE
+   emp_cnpj &lt;&gt; &#039;&#039;
+GROUP BY emp_cnpj
+HAVING COUNT(*) &gt; 1
+
+
+Se n&atilde;o importar qual das duplicatas ir&aacute; permanecer voc&ecirc; pode usar:
+
+CREATE</pre>'><a href='pg_encontrar_duplicados.txt'><img src='index.php@i=text'/> pg_encontrar_duplicados.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.49KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Exportar tabela com delimitador
+
+psql -h host (nome ou ip) -d nome_do_banco -U user -W
+Exportar a tabela com: 
+\copy nome_da_tabela to nome_da_tabela.txt with delimiter as &#039;;&#039;
+
+
+-------------------------- Copy----------------------------------</pre>'><a href='copy.txt'><img src='index.php@i=text'/> copy.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>629B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Dicas sobre o SGBD livre PostgreSQL
+
+CREATE DATABASE nomebanco;
+
+CREATE TABLE
+
+CREATE TABLE produtos(
+	id SERIAL NOT NULL,
+	descricao VARCHAR(40) default &#039;&#039; NOT NULL,
+	fornecedor_id INTEGER,
+	categoria_id INTEGER,
+	quantidade INTEGER,
+	preco DECIMAL(</pre>'><a href='1PostgreSQL_dicas.txt'><img src='index.php@i=text'/> 1PostgreSQL_dicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>3.59KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Agrupamento.sql'><img src='index.php@i=file'/> Agrupamento.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.44KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Uso do iconv
+
+iconv -f iso-8859-1 cep_brasil_unique.csv -t cp1252 -s -o cep_brasil_unique_1252.csv
+
+iconv -f iso-8859-1 cep_brasil_unique.csv -t utf8 -s -o cep_brasil_unique_utf8.csv
+
+No Windows
+
+iconv -c -s -f iso-8859-1 -t cp1252 cep_brasil_unique.</pre>'><a href='dicasubuntu.txt'><img src='index.php@i=text'/> dicasubuntu.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>662B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>SELECT rolname FROM pg_roles;
+ALTER ROLE myname SET enable_indexscan TO off;
+
+Functions and Triggers
+
+Functions and triggers allow users to insert code into the backend server that other users might execute unintentionally. Hence, both mechanisms per</pre>'><a href='pg_dicas.txt'><img src='index.php@i=text'/> pg_dicas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.22KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Postgres-Cheat-Sheet2.pdf'><img src='index.php@i=file'/> Postgres-Cheat-Sheet2.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>150.91KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pl.sql'><img src='index.php@i=file'/> pl.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.19KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>																	Delete
+
+DELETE FROM pedidos; -- Cuidado, excluir todos os registros da tabela pedidos
+
+DELETE FROM pedidos WHERE (codigo IS NULL); - - Remove sem confirmao nem com opo de desfazer.
+
+</pre>'><a href='delete.txt'><img src='index.php@i=text'/> delete.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>204B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Dicas2.odt'><img src='index.php@i=file'/> Dicas2.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.64KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Por padro, ao executar o initdb, se a
+opo &quot;-U foo&quot;  informada, o usurio foo (do SGBD) ser o superusurio
+do PostgreSQL; caso no tenha opo -U, ele definir o $USER (do SO)
+como superusurio do PostgreSQL, ou seja, o nome do superusurio do
+Po</pre>'><a href='initdb.txt'><img src='index.php@i=text'/> initdb.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>674B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ems_tutorial.pdf'><img src='index.php@i=file'/> ems_tutorial.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>431.77KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Uso do iconv
+
+iconv -f iso-8859-1 cep_brasil_unique.csv -t cp1252 -s -o cep_brasil_unique_1252.csv
+
+iconv -f iso-8859-1 cep_brasil_unique.csv -t utf8 -s -o cep_brasil_unique_utf8.csv
+
+No Windows
+
+iconv -c -s -f iso-8859-1 -t cp1252 cep_brasil_unique.</pre>'><a href='dicasubuntu2.txt'><img src='index.php@i=text'/> dicasubuntu2.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>662B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='VerificaÃÂÃÂ§ÃÂÃÂ£o&#32;de&#32;PostgreSQL.html'><img src='index.php@i=file'/> VerificaÃÂÃÂ§ÃÂÃÂ£o de PostgreSQL.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.83KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>PostgreSQL - migrando de LATIN1 para UTF-8
+
+Backup
+pg_dump -h localhost -U postgres -d apoena -Fp -v -f apoena.sql
+
+Convers&atilde;o para UTF-8
+iconv -f iso-8859-1 -t utf-8 apoenal.sql &gt; apoenau.sql
+
+
+Editar apoenau.sql e alterar a linha:
+
+SET client_encod</pre>'><a href='pg_migrarlatin1utf8.txt'><img src='index.php@i=text'/> pg_migrarlatin1utf8.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>428B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>------------------------------------------------------------------------------
+--                     Controle de Usurios Verso 1.1                      --
+------------------------------------------------------------------------------
+-- Verso:</pre>'><a href='usuario.txt'><img src='index.php@i=text'/> usuario.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>11.16KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='PostgreSQLConceptArch.pdf'><img src='index.php@i=file'/> PostgreSQLConceptArch.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>118.67KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Converso Explcita de Tipos (CAST)
+
+CAST ( expresso AS tipo ) AS apelido;  -- Sintaxe SQL ANSI
+
+Outra forma:
+
+Tipo ( expresso );
+
+Exemplo:
+
+SELECT DATE &#039;10/05/2002&#039; - DATE &#039;10/05/2001&#039;; -- Retorna a quantidade de dias 									   - -entre as duas </pre>'><a href='cast.txt'><img src='index.php@i=text'/> cast.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>872B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ConfiguracoesUbuntu7.pdf'><img src='index.php@i=file'/> ConfiguracoesUbuntu7.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>65.6KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Dicas.odt'><img src='index.php@i=file'/> Dicas.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>33.69KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Valores Boleanos em Consultas
+Exemplo de consulta com boolean:
+
+CREATE TABLE teste1 (a boolean, b text);
+INSERT INTO teste1 VALUES (TRUE, &#039;sic est&#039;);
+INSERT INTO teste1 VALUES (FALSE, &#039;non est&#039;);
+SELECT * FROM teste1;
+Retorno:
+a | b
+---+----</pre>'><a href='Boleanos.txt'><img src='index.php@i=text'/> Boleanos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>540B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='FuncoesPLPGSQL.sql'><img src='index.php@i=file'/> FuncoesPLPGSQL.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>10.77KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='exemplos_func_trig.sql'><img src='index.php@i=file'/> exemplos_func_trig.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>39.4KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='plpgsql.sql'><img src='index.php@i=file'/> plpgsql.sql</a></td>
+                                                
+                                <td>File</td>
+                                <td>36.21KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='style.class.php.html'><img src='index.php@i=file'/> style.class.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.22KB</td>
+                                <td>2024-01-31 08:47:00</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Preenchendo Lacunas de Campos Sequence
+
+Remover a sequncia
+- drop sequence produtos_codigo_seq cascade;
+
+Inserir os registros que preenchem as lacunas
+- INSERT INTO produtos (codigo, descricao, quantidade, data_compra, unidade, preco) VALUES (</pre>'><a href='lacunas_sequence.txt'><img src='index.php@i=text'/> lacunas_sequence.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>841B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='PostgreSQL&#32;Cheat&#32;Sheet.html'><img src='index.php@i=file'/> PostgreSQL Cheat Sheet.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.96KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Top&#32;ten&#32;SQL&#32;commands&#32;using&#32;psql.html'><img src='index.php@i=file'/> Top ten SQL commands using psql.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>37.44KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='FuncoesPlPgSQL.pdf'><img src='index.php@i=file'/> FuncoesPlPgSQL.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>93.05KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,2751 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='insmod.html'><img src='index.php@i=file'/> insmod.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.92KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pwd.html'><img src='index.php@i=file'/> pwd.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.9KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='rcs.html'><img src='index.php@i=file'/> rcs.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.65KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='time.html'><img src='index.php@i=file'/> time.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.87KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='grpunconv.html'><img src='index.php@i=file'/> grpunconv.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.11KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='chkconfig.html'><img src='index.php@i=file'/> chkconfig.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.42KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dir_home.html'><img src='index.php@i=file'/> dir_home.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.62KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tee.html'><img src='index.php@i=file'/> tee.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.96KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='addgroup.html'><img src='index.php@i=file'/> addgroup.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.22KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='hwclock.html'><img src='index.php@i=file'/> hwclock.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.89KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='telinit.html'><img src='index.php@i=file'/> telinit.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.01KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lscpu.html'><img src='index.php@i=file'/> lscpu.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.82KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='nl.html'><img src='index.php@i=file'/> nl.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.67KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dd.html'><img src='index.php@i=file'/> dd.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.16KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='split.html'><img src='index.php@i=file'/> split.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.27KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='variaveis_ambiente.html'><img src='index.php@i=file'/> variaveis_ambiente.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.13KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='inode.html'><img src='index.php@i=file'/> inode.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.91KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='depmod.html'><img src='index.php@i=file'/> depmod.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.33KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='df.html'><img src='index.php@i=file'/> df.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.87KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='usermod.html'><img src='index.php@i=file'/> usermod.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.84KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ispell.html'><img src='index.php@i=file'/> ispell.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.29KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pstree.html'><img src='index.php@i=file'/> pstree.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.52KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='rlogin.html'><img src='index.php@i=file'/> rlogin.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.8KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='uname.html'><img src='index.php@i=file'/> uname.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.46KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lspci.html'><img src='index.php@i=file'/> lspci.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.2KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='permissao.html'><img src='index.php@i=file'/> permissao.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>13.38KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='glibc.html'><img src='index.php@i=file'/> glibc.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.61KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dir_etc.html'><img src='index.php@i=file'/> dir_etc.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.2KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lshal.html'><img src='index.php@i=file'/> lshal.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.91KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dmidecode.html'><img src='index.php@i=file'/> dmidecode.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.67KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/servidores/Linux/Comandos/catalogcommands/index.php?Li9saWJj'><img src='index.php@i=folder'/> libc</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ypcat.html'><img src='index.php@i=file'/> ypcat.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.08KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='swap.html'><img src='index.php@i=file'/> swap.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.79KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='cp.html'><img src='index.php@i=file'/> cp.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.75KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pwconv.html'><img src='index.php@i=file'/> pwconv.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.19KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='xwindow.html'><img src='index.php@i=file'/> xwindow.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.55KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='updatedb.html'><img src='index.php@i=file'/> updatedb.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.48KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='rpm.html'><img src='index.php@i=file'/> rpm.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.23KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='fg.html'><img src='index.php@i=file'/> fg.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.48KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='apt-cache.html'><img src='index.php@i=file'/> apt-cache.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.65KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tac.html'><img src='index.php@i=file'/> tac.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.31KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='shutdown.html'><img src='index.php@i=file'/> shutdown.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.79KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='head.html'><img src='index.php@i=file'/> head.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.95KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='su.html'><img src='index.php@i=file'/> su.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.5KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lpc.html'><img src='index.php@i=file'/> lpc.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.42KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='hostname.html'><img src='index.php@i=file'/> hostname.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.76KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='sed.html'><img src='index.php@i=file'/> sed.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.96KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ppid.html'><img src='index.php@i=file'/> ppid.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.33KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='grub.html'><img src='index.php@i=file'/> grub.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.21KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='free.html'><img src='index.php@i=file'/> free.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.09KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='install.html'><img src='index.php@i=file'/> install.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.66KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='vim.html'><img src='index.php@i=file'/> vim.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.84KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='w.html'><img src='index.php@i=file'/> w.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.88KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='mkfs.html'><img src='index.php@i=file'/> mkfs.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.53KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='biosdecode.html'><img src='index.php@i=file'/> biosdecode.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.01KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='sort.html'><img src='index.php@i=file'/> sort.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.91KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dir_sbin.html'><img src='index.php@i=file'/> dir_sbin.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.8KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='fuser.html'><img src='index.php@i=file'/> fuser.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.24KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lprm.html'><img src='index.php@i=file'/> lprm.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.96KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='id.html'><img src='index.php@i=file'/> id.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.21KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='visudo.html'><img src='index.php@i=file'/> visudo.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.08KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='chsh.html'><img src='index.php@i=file'/> chsh.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.45KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='getcap.html'><img src='index.php@i=file'/> getcap.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.99KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='nis.html'><img src='index.php@i=file'/> nis.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.7KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tr.html'><img src='index.php@i=file'/> tr.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.45KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='stat.html'><img src='index.php@i=file'/> stat.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.82KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='login.html'><img src='index.php@i=file'/> login.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.25KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pwunconv.html'><img src='index.php@i=file'/> pwunconv.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.1KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='printenv.html'><img src='index.php@i=file'/> printenv.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.57KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='export.html'><img src='index.php@i=file'/> export.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.81KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='mkdir.html'><img src='index.php@i=file'/> mkdir.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.43KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tar.html'><img src='index.php@i=file'/> tar.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.22KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='nohup.html'><img src='index.php@i=file'/> nohup.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.01KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='bc.html'><img src='index.php@i=file'/> bc.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.57KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='more.html'><img src='index.php@i=file'/> more.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.37KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='man.html'><img src='index.php@i=file'/> man.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>9.5KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='fdisk.html'><img src='index.php@i=file'/> fdisk.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.09KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='gid.html'><img src='index.php@i=file'/> gid.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.62KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='whatis.html'><img src='index.php@i=file'/> whatis.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.37KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='umask.html'><img src='index.php@i=file'/> umask.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.56KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='size.html'><img src='index.php@i=file'/> size.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.61KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='zip.html'><img src='index.php@i=file'/> zip.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.74KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='uid.html'><img src='index.php@i=file'/> uid.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.5KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ps2pdf.html'><img src='index.php@i=file'/> ps2pdf.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.86KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='inxi.html'><img src='index.php@i=file'/> inxi.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.79KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ipcs.html'><img src='index.php@i=file'/> ipcs.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.58KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='apropos.html'><img src='index.php@i=file'/> apropos.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.32KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='consoles.html'><img src='index.php@i=file'/> consoles.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.17KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='biblioteca_c.html'><img src='index.php@i=file'/> biblioteca_c.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>26.21KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='vmstat.html'><img src='index.php@i=file'/> vmstat.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.87KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='last.html'><img src='index.php@i=file'/> last.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.17KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='desempenho.html'><img src='index.php@i=file'/> desempenho.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.86KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lilo.html'><img src='index.php@i=file'/> lilo.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.87KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='chamadas.html'><img src='index.php@i=file'/> chamadas.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>37KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='info.html'><img src='index.php@i=file'/> info.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.83KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tail.html'><img src='index.php@i=file'/> tail.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.29KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='finger.html'><img src='index.php@i=file'/> finger.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.02KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='uptime.html'><img src='index.php@i=file'/> uptime.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.3KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='clear.html'><img src='index.php@i=file'/> clear.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.66KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='delgroup.html'><img src='index.php@i=file'/> delgroup.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.51KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='modinfo.html'><img src='index.php@i=file'/> modinfo.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.84KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='wc.html'><img src='index.php@i=file'/> wc.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.57KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='fmt.html'><img src='index.php@i=file'/> fmt.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.73KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='unalias.html'><img src='index.php@i=file'/> unalias.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.12KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='linux.html'><img src='index.php@i=file'/> linux.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.73KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='cd.html'><img src='index.php@i=file'/> cd.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.22KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='rm.html'><img src='index.php@i=file'/> rm.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.52KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lsusb.html'><img src='index.php@i=file'/> lsusb.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.48KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='comandos.html'><img src='index.php@i=file'/> comandos.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.58KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='rev.html'><img src='index.php@i=file'/> rev.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.4KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='curingas.html'><img src='index.php@i=file'/> curingas.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.65KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='mkswap.html'><img src='index.php@i=file'/> mkswap.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.98KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='iostat.html'><img src='index.php@i=file'/> iostat.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.28KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='http://backup/material/servidores/Linux/Comandos/catalogcommands/index.php?Li9hc3NldHM='><img src='index.php@i=folder'/> assets</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='groupdel.html'><img src='index.php@i=file'/> groupdel.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.44KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='apt-get.html'><img src='index.php@i=file'/> apt-get.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.33KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='userdel.html'><img src='index.php@i=file'/> userdel.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.81KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='sudo.html'><img src='index.php@i=file'/> sudo.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.04KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='uuid.html'><img src='index.php@i=file'/> uuid.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.8KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='mbr.html'><img src='index.php@i=file'/> mbr.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.6KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='useradd.html'><img src='index.php@i=file'/> useradd.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.48KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ifconfig.html'><img src='index.php@i=file'/> ifconfig.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.52KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='seq.html'><img src='index.php@i=file'/> seq.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.01KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='mke2fs.html'><img src='index.php@i=file'/> mke2fs.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.71KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='gdb.html'><img src='index.php@i=file'/> gdb.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.37KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='file.html'><img src='index.php@i=file'/> file.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.7KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ps.html'><img src='index.php@i=file'/> ps.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.17KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='who.html'><img src='index.php@i=file'/> who.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.94KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='strings.html'><img src='index.php@i=file'/> strings.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.22KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='find.html'><img src='index.php@i=file'/> find.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>11.2KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ar.html'><img src='index.php@i=file'/> ar.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.29KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lpr.html'><img src='index.php@i=file'/> lpr.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.33KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='fsck.html'><img src='index.php@i=file'/> fsck.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.37KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tex.html'><img src='index.php@i=file'/> tex.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.34KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='chmod.html'><img src='index.php@i=file'/> chmod.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>12.33KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='setcap.html'><img src='index.php@i=file'/> setcap.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.73KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='adduser.html'><img src='index.php@i=file'/> adduser.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>8.83KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='rmmod.html'><img src='index.php@i=file'/> rmmod.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.71KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='help.html'><img src='index.php@i=file'/> help.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.29KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='deluser.html'><img src='index.php@i=file'/> deluser.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.75KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='kill.html'><img src='index.php@i=file'/> kill.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.56KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='hwinfo.html'><img src='index.php@i=file'/> hwinfo.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.39KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='unset.html'><img src='index.php@i=file'/> unset.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.31KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='mc.html'><img src='index.php@i=file'/> mc.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.56KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='inicializacao.html'><img src='index.php@i=file'/> inicializacao.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.92KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='users.html'><img src='index.php@i=file'/> users.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.12KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='slabtop.html'><img src='index.php@i=file'/> slabtop.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.91KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='root.html'><img src='index.php@i=file'/> root.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.86KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='cat.html'><img src='index.php@i=file'/> cat.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.39KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='quotaoff.html'><img src='index.php@i=file'/> quotaoff.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.23KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pidof.html'><img src='index.php@i=file'/> pidof.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.09KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='make.html'><img src='index.php@i=file'/> make.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.63KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='index.php.html'><img src='index.php@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='locate.html'><img src='index.php@i=file'/> locate.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.88KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ulimit.html'><img src='index.php@i=file'/> ulimit.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>9.36KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='index.html'><img src='index.php@i=file'/> index.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>35.5KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='passwd.html'><img src='index.php@i=file'/> passwd.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.63KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='awk.html'><img src='index.php@i=file'/> awk.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>17.59KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='capacidades.html'><img src='index.php@i=file'/> capacidades.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>18.39KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dir_tmp.html'><img src='index.php@i=file'/> dir_tmp.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.71KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='newgrp.html'><img src='index.php@i=file'/> newgrp.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.4KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lshw.html'><img src='index.php@i=file'/> lshw.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.24KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='mandb.html'><img src='index.php@i=file'/> mandb.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.29KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='redirecionadores.html'><img src='index.php@i=file'/> redirecionadores.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.46KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dvips.html'><img src='index.php@i=file'/> dvips.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.4KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='mesg.html'><img src='index.php@i=file'/> mesg.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.93KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='swapon.html'><img src='index.php@i=file'/> swapon.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.02KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='modprobe.html'><img src='index.php@i=file'/> modprobe.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.21KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='hdparm.html'><img src='index.php@i=file'/> hdparm.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.96KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dir_bin.html'><img src='index.php@i=file'/> dir_bin.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.58KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='gcc.html'><img src='index.php@i=file'/> gcc.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.4KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='import.html'><img src='index.php@i=file'/> import.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.93KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dmesg.html'><img src='index.php@i=file'/> dmesg.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.17KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='quotaon.html'><img src='index.php@i=file'/> quotaon.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.24KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ipcrm.html'><img src='index.php@i=file'/> ipcrm.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.6KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='whoami.html'><img src='index.php@i=file'/> whoami.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.2KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='grpconv.html'><img src='index.php@i=file'/> grpconv.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.22KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lesskey.html'><img src='index.php@i=file'/> lesskey.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.71KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='diff.html'><img src='index.php@i=file'/> diff.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.33KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='aptitude.html'><img src='index.php@i=file'/> aptitude.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.94KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lsscsi.html'><img src='index.php@i=file'/> lsscsi.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.34KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='makedev.html'><img src='index.php@i=file'/> makedev.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.6KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='netstat.html'><img src='index.php@i=file'/> netstat.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.83KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='groupmod.html'><img src='index.php@i=file'/> groupmod.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.78KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='sync.html'><img src='index.php@i=file'/> sync.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.69KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='mpage.html'><img src='index.php@i=file'/> mpage.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='apt.html'><img src='index.php@i=file'/> apt.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.52KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='rfkill.html'><img src='index.php@i=file'/> rfkill.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.44KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='exit.html'><img src='index.php@i=file'/> exit.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.86KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='atq.html'><img src='index.php@i=file'/> atq.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.36KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='crontab.html'><img src='index.php@i=file'/> crontab.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>9.37KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='expand.html'><img src='index.php@i=file'/> expand.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.03KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='teclas.html'><img src='index.php@i=file'/> teclas.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.1KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='bg.html'><img src='index.php@i=file'/> bg.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.35KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='readelf.html'><img src='index.php@i=file'/> readelf.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.5KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='swapoff.html'><img src='index.php@i=file'/> swapoff.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.88KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='groups.html'><img src='index.php@i=file'/> groups.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.31KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='wget.html'><img src='index.php@i=file'/> wget.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.85KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lsmod.html'><img src='index.php@i=file'/> lsmod.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.38KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tty.html'><img src='index.php@i=file'/> tty.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.58KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ln.html'><img src='index.php@i=file'/> ln.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.68KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='separador.html'><img src='index.php@i=file'/> separador.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.68KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='bzip2.html'><img src='index.php@i=file'/> bzip2.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.31KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tree.html'><img src='index.php@i=file'/> tree.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.4KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='cotas.html'><img src='index.php@i=file'/> cotas.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.11KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lastlog.html'><img src='index.php@i=file'/> lastlog.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.85KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='sistemas_de_arquivos.html'><img src='index.php@i=file'/> sistemas_de_arquivos.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>9.56KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lsof.html'><img src='index.php@i=file'/> lsof.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.16KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='nice.html'><img src='index.php@i=file'/> nice.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.11KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='zgrep.html'><img src='index.php@i=file'/> zgrep.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.09KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='echo.html'><img src='index.php@i=file'/> echo.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.95KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='xargs.html'><img src='index.php@i=file'/> xargs.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.86KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='shell.html'><img src='index.php@i=file'/> shell.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>43.5KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='quota.html'><img src='index.php@i=file'/> quota.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.28KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='killall.html'><img src='index.php@i=file'/> killall.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.37KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='mount.html'><img src='index.php@i=file'/> mount.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.16KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='less.html'><img src='index.php@i=file'/> less.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.78KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='gzip.html'><img src='index.php@i=file'/> gzip.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.93KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='vigr.html'><img src='index.php@i=file'/> vigr.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.6KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='date.html'><img src='index.php@i=file'/> date.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.04KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='stty.html'><img src='index.php@i=file'/> stty.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.91KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='processo.html'><img src='index.php@i=file'/> processo.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>14.42KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='getty.html'><img src='index.php@i=file'/> getty.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.8KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='atrm.html'><img src='index.php@i=file'/> atrm.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.52KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='sinal.html'><img src='index.php@i=file'/> sinal.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>12.16KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dir_boot.html'><img src='index.php@i=file'/> dir_boot.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.76KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ls.html'><img src='index.php@i=file'/> ls.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.02KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='source.html'><img src='index.php@i=file'/> source.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.12KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='hardware.html'><img src='index.php@i=file'/> hardware.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.05KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='mv.html'><img src='index.php@i=file'/> mv.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.55KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='chown.html'><img src='index.php@i=file'/> chown.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.52KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='compress.html'><img src='index.php@i=file'/> compress.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.31KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dir_proc.html'><img src='index.php@i=file'/> dir_proc.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>9.47KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='xhost.html'><img src='index.php@i=file'/> xhost.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.88KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lsblk.html'><img src='index.php@i=file'/> lsblk.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.6KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='gv.html'><img src='index.php@i=file'/> gv.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='du.html'><img src='index.php@i=file'/> du.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.15KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='setterm.html'><img src='index.php@i=file'/> setterm.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.59KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='touch.html'><img src='index.php@i=file'/> touch.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.14KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='vipw.html'><img src='index.php@i=file'/> vipw.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.53KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='cal.html'><img src='index.php@i=file'/> cal.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.96KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='init.html'><img src='index.php@i=file'/> init.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>6.15KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='arch.html'><img src='index.php@i=file'/> arch.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.15KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='pid.html'><img src='index.php@i=file'/> pid.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.11KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='cut.html'><img src='index.php@i=file'/> cut.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.9KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='groupadd.html'><img src='index.php@i=file'/> groupadd.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.42KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lastb.html'><img src='index.php@i=file'/> lastb.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.33KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='display.html'><img src='index.php@i=file'/> display.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.91KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='top.html'><img src='index.php@i=file'/> top.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>5.38KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='capsh.html'><img src='index.php@i=file'/> capsh.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.82KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='latex.html'><img src='index.php@i=file'/> latex.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.42KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='xman.html'><img src='index.php@i=file'/> xman.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.12KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='grep.html'><img src='index.php@i=file'/> grep.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.7KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='modulos.html'><img src='index.php@i=file'/> modulos.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>10.87KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='lpq.html'><img src='index.php@i=file'/> lpq.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.31KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='telnet.html'><img src='index.php@i=file'/> telnet.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.32KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='redes.html'><img src='index.php@i=file'/> redes.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>7.56KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='ac.html'><img src='index.php@i=file'/> ac.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.43KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='renice.html'><img src='index.php@i=file'/> renice.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='smartctl.html'><img src='index.php@i=file'/> smartctl.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.62KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='alias.html'><img src='index.php@i=file'/> alias.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.51KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='arquivo.html'><img src='index.php@i=file'/> arquivo.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>12KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='chfn.html'><img src='index.php@i=file'/> chfn.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.03KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='uniq.html'><img src='index.php@i=file'/> uniq.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.04KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='env.html'><img src='index.php@i=file'/> env.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.42KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='tempo_unix.html'><img src='index.php@i=file'/> tempo_unix.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.6KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='reboot.html'><img src='index.php@i=file'/> reboot.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.16KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='chgrp.html'><img src='index.php@i=file'/> chgrp.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.18KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='umount.html'><img src='index.php@i=file'/> umount.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.59KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='style.class.php.html'><img src='index.php@i=file'/> style.class.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.22KB</td>
+                                <td>2024-01-31 08:47:00</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='history.html'><img src='index.php@i=file'/> history.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.55KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='at.html'><img src='index.php@i=file'/> at.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>10.91KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='rmdir.html'><img src='index.php@i=file'/> rmdir.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>3.27KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='whereis.html'><img src='index.php@i=file'/> whereis.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>2.91KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='dir_var.html'><img src='index.php@i=file'/> dir_var.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.96KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

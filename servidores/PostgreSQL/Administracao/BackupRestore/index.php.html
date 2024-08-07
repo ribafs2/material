@@ -1,0 +1,588 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../../index.php@Li9BZG1pbmlzdHJhY2Fv.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Temos 2 tipos de Backup
+
+1. Backup off-line (n[21~[21~o indicado);
+
+	1.1 banco de dados tem de estar parado;
+	1.2 backup de todos os DB;
+	1.3 ocupa espao de tabelas+indices+estruturas
+	1.4 restore somente na mesma versao
+	
+	linux 	-&gt; /var/lib/pgsql</pre>'><a href='Backup.txt'><img src='index.php@i=text'/> Backup.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.25KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Using PostgreSQL
+pg_dump: dumps your database into a file
+check out &#039;pg_dump --help&#039; for more info.
+THis command will back-up schema and data for a specific table
+
+% pg_dump -D -f /menu_items.sql -F p -N -t menu_items -U postgres domus
+; Anothe</pre>'><a href='PostgreBackup.txt'><img src='index.php@i=text'/> PostgreBackup.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.49KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Usando o cron como despertador
+https://www.vivaolinux.com.br/dicas/impressora.php?codigo=12743
+</pre>'><a href='links.txt'><img src='index.php@i=text'/> links.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>95B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='Backup&#32;lÃÂÃÂ³gico&#32;e&#32;fÃÂÃÂ­sico&#32;do&#32;postgresql.odt'><img src='index.php@i=file'/> Backup lÃÂÃÂ³gico e fÃÂÃÂ­sico do postgresql.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>23.78KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Sintaxe dos comandos para backup
+
+pg_dump
+
+-a - somente dados
+-C - recriar os bancos de dados no restore
+-d - incluir INSEERTs no script
+-F{c|t|p} - c(gzip), t(tar), p(plain text)
+-O - sem o user dono. No restore ser&aacute; o dono quem restaura
+-s - somen</pre>'><a href='backuplogico_restore.txt'><img src='index.php@i=text'/> backuplogico_restore.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>7.25KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='backup_restore.html'><img src='index.php@i=file'/> backup_restore</a></td>
+                                                
+                                <td>File</td>
+                                <td>471B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='WALePITR.odt'><img src='index.php@i=file'/> WALePITR.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>43.08KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/bash
+# *********************************************************************
+# Script diario do Banco de Dados PostgreSQL
+# Procedimentos de vacuum e dump de todos os
+# Bancos de Dados de um Servidor
+# Sintaxe do comando:
+# /PATH/bkpdbserver.s</pre>'><a href='bkpdbserver.sh'><img src='index.php@i=script'/> bkpdbserver.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>5.58KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>WAL - Write - Ahead Logging
+
+&Eacute; o registro sequencial dos logs de cada troca feita nos arquivos de dados do 
+banco de dados (nas transa&ccedil;&otilde;es), que possibilita reduzir o n&uacute;mero de grava&ccedil;&otilde;es 
+de p&aacute;gina de dados no disco (I/O).
+
+Ajuda a minimizar a</pre>'><a href='wal.txt'><img src='index.php@i=text'/> wal.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.24KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='index.php.html'><img src='index.php@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/bash
+# *********************************************************************
+# Script diario do Banco de Dados PostgreSQL
+# Procedimentos de vacuum e dump de um unico banco
+# Sintaxe do comando:
+# /PATH/bancobkp.sh nome_do_banco
+# ************</pre>'><a href='bancobkp.sh'><img src='index.php@i=script'/> bancobkp.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>5.32KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+PITR - Point-in-time recovery.
+
+Quando voc&ecirc; faz uma mudan&ccedil;a num banco de dados do PostgreSQL, ele grava suas mudan&ccedil;as no shared-buffer pool, o write aehad log (WAL) e eventualmente no arquivo que voc&ecirc; mudou. O WAL cont&eacute;m registros completos das</pre>'><a href='PITR.txt'><img src='index.php@i=text'/> PITR.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>680B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Installing postgresql
+
+1. Obtain the latest version of postgresql
+2. tar -zxf postgresql-7.0.3.tar.gz
+3. cd postgresql-7.0.3/src
+4. ./configure --with-maxbackends=N (Where N is the maximum connections to postgresql)
+5. make
+6. make install
+7.</pre>'><a href='backupeInstalling&#32;postgresql.txt'><img src='index.php@i=text'/> backupeInstalling postgresql.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.12KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='jdbdump.war.html'><img src='index.php@i=file'/> jdbdump.war</a></td>
+                                                
+                                <td>File</td>
+                                <td>4.32MB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='autopostgresqlbackup.sh.1.0'><img src='index.php@i=file'/> autopostgresqlbackup.sh.1.0</a></td>
+                                                
+                                <td>File</td>
+                                <td>16.63KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/bash
+# PostgreSQL database backup script - Copyright 2003 Edoceo Systems, Inc.
+#  This script is distributed under the terms of the GNU General Public
+#    License.  A copy is available at http://www.gnu.org/
+
+# Full path to the needed co</pre>'><a href='backup_script_pg.txt'><img src='index.php@i=text'/> backup_script_pg.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.51KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/bash
+#
+# Script Shel 
+# by Paulo de Oliveira 
+#
+# Constantes do Scrpt
+CaminhoArquivo=/root/`date +bkp%d%m%Y%Hhor%Mmin.bkp`
+BancoDeDados=emp03
+vacuumdb -z -U postgres $BancoDeDados 
+pg_dump -U postgres $BancoDeDados &gt; $CaminhoArquivo
+
+</pre>'><a href='bkp.sh'><img src='index.php@i=script'/> bkp.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>241B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/sh
+#/usr/local/bin/pgback.sh
+
+# Adaptado de - http://www.sertoriopen.com.br/?p=55
+
+# Documenta&ccedil;&atilde;o: https://www.postgresql.org/docs/9.6/static/app-pgdump.html
+# Uso: pgback.sh nomebanco nomeesquema
+
+if [ &quot;$1&quot; = &quot;-h&quot; ] || [ &quot;$1&quot; = &quot;--help&quot;  ] </pre>'><a href='pgback.sh'><img src='index.php@i=script'/> pgback.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>1.33KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Backup e restore com Crontab
+
+Put a line in crontab like:
+3  5 * * * /script/backdb.sh
+
+and the script  /script/backdb.sh
+could then look like:
+
+#!/bin/bash
+DATE=`date +%Y%m%d`
+/usr/pgsql/bin/pg_dump databas &gt; /tmp/dump.$DATE
+
+then you have a file in</pre>'><a href='backup_cron.txt'><img src='index.php@i=text'/> backup_cron.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>606B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/sh
+
+# This small script will create full backups of your database named like
+# [database name]-[date].sql
+# where date is day of current date. This will make one month worth of
+# backups. It will automatically backup *ALL* databases on system.</pre>'><a href='cron-backup.sh'><img src='index.php@i=script'/> cron-backup.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>772B</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>#!/bin/sh
+#
+# Postgresql backup script
+#
+# Author
+#  |
+#  +-- speedboy (speedboy_420 at hotmail dot com)
+#
+# Last modified
+#  |
+#  +-- 16-10-2001
+#  
+# Version
+#  |
+#  +-- 1.1.2
+#
+# Description
+#  |
+#  +-- A bourne shell script that automates the bac</pre>'><a href='pg_backup.sh'><img src='index.php@i=script'/> pg_backup.sh</a></td>
+                                                
+                                <td>System script</td>
+                                <td>16.35KB</td>
+                                <td>2024-02-03 11:21:26</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='style.class.php.html'><img src='index.php@i=file'/> style.class.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.22KB</td>
+                                <td>2024-01-31 08:47:00</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>

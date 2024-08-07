@@ -1,0 +1,1495 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RibaFS Material bruto</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+        <style>
+        .container {
+            padding-top: 150px;
+            padding-bottom: 60px;
+            width: 80%;
+        }
+        
+        .page-header {
+            float: left;
+            position: absolute;
+            margin-top: 50px;
+            width: 100%;
+            background-color: white;
+        }
+        
+        .filter {
+            text-align: right;
+            margin: auto;
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            height: 34px;
+        }
+        
+        .pagingfull_numbers {
+            text-align: left;
+            margin: auto;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+        }
+        
+        .info {
+            text-align: center;
+            position: fixed;
+            width: 380px;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+        
+        #display_menu {
+            width: auto;
+            display: inline;
+        }
+
+        table {
+            margin: 1em 0;
+            clear: both;
+        }
+        </style>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+        <script>
+			/* Default class modification */
+			$.extend( $.fn.dataTableExt.oStdClasses, {
+                 "sInfo": "help-block",
+                 "sPageFirst": "btn btn-primary",
+                 "sPagePrevious": "btn btn-primary",
+                 "sPageNext": "btn btn-primary",
+                 "sPageLast": "btn btn-primary",
+                 "sPageButton": "btn btn-default",
+                 "sPageButtonStaticDisabled": "btn btn-default disabled",
+                 "sPageButtonActive": "btn btn-default disabled",
+                 "sFilter": "filter",
+                 "sPaging": "paging",
+                 "sInfo": "info well well-sm",
+			} );
+            
+            /* Sort by human-readable file size. http://datatables.net/plug-ins/sorting#file_size */
+            $.extend( $.fn.dataTableExt.oSort, {
+                "file-size-pre": function ( a ) {
+                    var x = a.substring(0,a.length - 2);
+                    
+                    if (a.substring(a.length - 2, a.length) == "KB") {
+                        var x_unit = 1024;
+                    } else if (a.substring(a.length - 2, a.length) == "MB") {
+                        var x_unit = 1048576;
+                    } else if (a.substring(a.length - 2, a.length) == "GB") {
+                        var x_unit = 1073741824;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1099511627776;
+                    } else if (a.substring(a.length - 2, a.length) == "TB") {
+                        var x_unit = 1125899906842624;
+                    } else if (a.substring(a.length - 1, a.length) == "B") {
+                        x = a.substring(0,a.length - 1);
+                        var x_unit = 1;
+                    } else {
+                        return -1;
+                    }
+
+                    return parseInt( x * x_unit, 10 );
+                },
+             
+                "file-size-asc": function ( a, b ) {
+                    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+                },
+             
+                "file-size-desc": function ( a, b ) {
+                    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+                }
+            } );
+            
+
+            $(document).ready(function() {
+                /* Mother of sort and filtering */
+                $('.table').dataTable({
+                    "sPaginationType": "full_numbers",
+                    "iDisplayLength": 10,
+                    "oLanguage": {
+                        "sSearch": "",
+                        "sInfo": "Showing from _START_ to _END_ of _TOTAL_ entitles",
+                        "sInfoFiltered": "<br/>(Filtered from _MAX_ entitles)",
+                        "sInfoEmpty": "No matched results",
+                        "sEmptyTable": "Folder contains no content",
+                        "sLengthMenu": 'Show<select id="display_menu" class="form-control">'+
+                                                '<option value="10">10</option>'+
+                                                '<option value="20">20</option>'+
+                                                '<option value="30">30</option>'+
+                                                '<option value="50">50</option>'+
+                                                '<option value="100">100</option>'+
+                                                '<option value="-1">All</option>'+
+                            '</select>entitles',
+                        "oPaginate": {
+                            "sFirst": "First",
+                            "sLast": "Last",
+                            "sNext": "Next",
+                            "sPrevious": "Previous",
+                        }
+                    },
+                    "aaSorting": [
+                        [ 1, "asc" ],
+                        [ 0, "asc" ]
+                    ],
+                    "aoColumns": [
+                        null,
+                        null,
+                        { "sType": "file-size" },
+                        null
+                    ]
+                });
+                $("input[aria-controls='DataTables_Table_0']").addClass("form-control");
+                $("input[aria-controls='DataTables_Table_0']").attr("placeholder", "Filter");
+                
+                /* Set navbar(.page-header) to fixed if it is scrolled over */
+                var navpos = $(".page-header").offset();
+                $(window).bind('scroll', function() {
+                    if ($(window).scrollTop() > navpos.top && $(window).height() > 500) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    } else {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    }
+                });
+
+                function responsive() {
+                    if ($(window).width()/2 <= paginateWidth + 210) {
+                        $(".well-sm").removeClass("info");
+                    } else {
+                        $(".well-sm").addClass("info");
+                    }
+                    if ($(window).width() <= paginateWidth + filterWidth + 156) {
+                        $("#DataTables_Table_0_filter").removeClass("filter");
+                        $("#DataTables_Table_0_paginate").removeClass("pagingfull_numbers");
+                    } else {
+                        $("#DataTables_Table_0_filter").addClass("filter");
+                        $("#DataTables_Table_0_paginate").addClass("pagingfull_numbers");
+                    }
+                    if (paginateWidth >= $(".table-responsive").width()) {
+                        $("#DataTables_Table_0_first").text("<<");
+                        $("#DataTables_Table_0_previous").text("<");
+                        $("#DataTables_Table_0_next").text(">");
+                        $("#DataTables_Table_0_last").text(">>");
+                    } else {
+                        $("#DataTables_Table_0_first").text(firstStr);
+                        $("#DataTables_Table_0_previous").text(prevStr);
+                        $("#DataTables_Table_0_next").text(nextStr);
+                        $("#DataTables_Table_0_last").text(lastStr);
+                    }
+                    
+                    if ($(window).width() <= 960) {
+                        $(".container").css({
+                            "width": "100%",
+                            "padding-right": "0px",
+                            "padding-left": "0px",
+                        });
+                    } else {
+                        $(".container").css({
+                            "width": "80%",
+                            "padding-right": "15px",
+                            "padding-left": "15px",
+                        });
+                    }
+                    
+                    if ($(window).height() <= 500) {
+                        $(".page-header").css({
+                            "position": "absolute",
+                            "margin-top": "50px",
+                        });
+                    } else if ($(window).scrollTop() > navpos.top) {
+                        $(".page-header").css({
+                            "position": "fixed",
+                            "margin-top": "0px",
+                        });
+                    }
+                }
+                
+                function helpersInit() {
+                    $(".page-header").tooltip({
+                        container: "body",
+                        placement: "auto",
+                    });
+
+                    $('.has_popover').popover({
+                        trigger: "hover",
+                        container: "body",
+                        placement: "auto",
+                        html: true,
+                    });
+                }
+
+                  $(window).resize(function() {
+                                    responsive();
+                                });
+                                $("#display_menu").change(function() {
+                                    paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                });
+                                var paginateWidth = $("#DataTables_Table_0_paginate").width();
+                                var filterWidth = $(".form-control").width();
+                                var firstStr = $("#DataTables_Table_0_first").html()
+                                var prevStr = $("#DataTables_Table_0_previous").html()
+                                var nextStr = $("#DataTables_Table_0_next").html()
+                                var lastStr = $("#DataTables_Table_0_last").html()
+                            responsive();  $("body").bind("click mouseover", function() {
+                                    helpersInit();
+                                });
+                            helpersInit();            });
+        </script>
+	</head>
+    <body>
+        <div title="Go back to parent directory" class="page-header" style="text-align: center; ">
+            <h1><a href='../index.php@Li9MaW5ndWFnZW5z.html'>RibaFS Material bruto</a></h1>
+        </div>
+        <div class="container">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
+                    <thead>
+                        <tr>
+                            <th title="File name">File name</th>
+                            <th title="Type">Type</th>
+                            <th title="Size" style="width: 90px;">Size</th>
+                            <th title="Last modified" style="width: 160px;">Last modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                                                
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1COMPLETO.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1COMPLETO.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>472.1KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Valores Nulos
+
+Nulo interagindo com qualquer valor usando qualquer opera&ccedil;&atilde;o resulta nulo.
+
+
+NULL n&atilde;o &eacute; = NULL
+
+
+COALESCE - fun&ccedil;&atilde;o que retorna o primeiro de seus argumentos que n&atilde;o &eacute; nulo.
+Ser&aacute; retornado NULL somente se todos os argumentos fo</pre>'><a href='LinguagemSQL/nulos.txt'><img src='LinguagemSQL/index.html@i=text'/> nulos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.05KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula13Heranca.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula13Heranca.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>22.01KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Agrupando Registros
+
+Sintaxe
+select campo, funo(campo)
+	from tabela
+	group by campo
+	having campo;
+	
+Group by condensa em uma nica linha todos os registros que possuem o mesmo valor do campo do group by.
+
+select sexo, count(*) from aluno</pre>'><a href='LinguagemSQL/agrupamento.txt'><img src='LinguagemSQL/index.html@i=text'/> agrupamento.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>343B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/pg_views_tutorial.odt'><img src='LinguagemSQL/index.html@i=file'/> pg_views_tutorial.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>14.11KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Restri&ccedil;&otilde;es/Constraints
+
+As restri&ccedil;&otilde;es s&atilde;o adicionadas para impor regras a n&iacute;vel de tabela, para agir
+sempre que um registro for inserido, alterado ou exclu&iacute;do. A opera&ccedil;&atilde;o somente
+ser&aacute; bem sucedida se atender a todas as restri&ccedil;&otilde;es dos camp</pre>'><a href='LinguagemSQL/constraints.txt'><img src='LinguagemSQL/index.html@i=text'/> constraints.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>4.59KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>JOIN
+
+Recuperar dados de duas ou mais tabelas.
+Caso o nome de algum campo se repita entre as tabelas, ele precisar&aacute; ser prefi-
+xado com o nome da tabela.
+
+NATURAL JOIN
+Faz a jun&ccedil;&atilde;o de todos os campos com o mesmo nome em ambas as tabelas.
+
+Exemplos</pre>'><a href='LinguagemSQL/join.txt'><img src='LinguagemSQL/index.html@i=text'/> join.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.28KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Sequ&ecirc;ncia
+
+Serial - &eacute; um inteiro que gera uma sequ&ecirc;ncia autom&aacute;tica somando + 1.
+
+&Eacute; um n&uacute;mero sequencial usado nas primary key.
+Quando usamos serial em um campo, o PostgrSQL adiciona automaticamente uma
+sequ&ecirc;ncia.
+
+
+</pre>'><a href='LinguagemSQL/sequencia.txt'><img src='LinguagemSQL/index.html@i=text'/> sequencia.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>222B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula6Operadores.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula6Operadores.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>126.31KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula14FuncoesTriggers.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula14FuncoesTriggers.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>68.31KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula13Heranca.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula13Heranca.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>48.94KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/pg_transacoes.odt'><img src='LinguagemSQL/index.html@i=file'/> pg_transacoes.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>35.95KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/pg_FormataÃÂÃÂ§ÃÂÃÂ£o.htm'><img src='LinguagemSQL/index.html@i=file'/> pg_FormataÃÂÃÂ§ÃÂÃÂ£o.htm</a></td>
+                                                
+                                <td>File</td>
+                                <td>12.33KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula10FiltrandoDados.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula10FiltrandoDados.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>34.56KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Comandos DDL, DQL, DML, DCL, DTL, TCL?
+Os comandos SQL s&atilde;o agrupados em cinco categorias. Segue abaixo suas defini&ccedil;&otilde;es e utiliza&ccedil;&otilde;es.
+
+DDL &ndash; Data Definition Language - Linguagem de Defini&ccedil;&atilde;o de Dados.
+Estes comandos s&atilde;o utilizados para defi</pre>'><a href='LinguagemSQL/definicoes.txt'><img src='LinguagemSQL/index.html@i=text'/> definicoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.29KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Using&#32;PostgreSQL&#32;and&#32;gnuplot.pdf'><img src='LinguagemSQL/index.html@i=file'/> Using PostgreSQL and gnuplot.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>122.64KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula3DDL.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula3DDL.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>20.43KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Subconsultas.odt'><img src='LinguagemSQL/index.html@i=file'/> Subconsultas.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>25.68KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/DDL.odt'><img src='LinguagemSQL/index.html@i=file'/> DDL.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>18.63KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>CREATE OR REPLACE FUNCTION Alunos() RETURNS setof identificacao AS 
+&#039;SELECT codigo FROM identificacao;&#039; 
+LANGUAGE SQL;</pre>'><a href='LinguagemSQL/Alunos.txt'><img src='LinguagemSQL/index.html@i=text'/> Alunos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>120B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/sqltutorial.pdf'><img src='LinguagemSQL/index.html@i=file'/> sqltutorial.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>273.23KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Uma view &eacute; uma consulta armazenada ou uma tabela l&oacute;gica. A view n&atilde;o armazena
+registros, apenas tem as consultas armazenadas. Os registros permanecem nas
+tabelas de origem.
+
+Sintaxe
+create [or replace] view nomeview as subconsulta;
+
+Exemplo:
+create</pre>'><a href='LinguagemSQL/views.txt'><img src='LinguagemSQL/index.html@i=text'/> views.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>424B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Transacoes.odt'><img src='LinguagemSQL/index.html@i=file'/> Transacoes.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>28.28KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula1.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula1.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>432.83KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Conjuntos.odt'><img src='LinguagemSQL/index.html@i=file'/> Conjuntos.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>24.83KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula12ConstraintsIntegrRef.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula12ConstraintsIntegrRef.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>23.18KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula11Transacoes.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula11Transacoes.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>23.07KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/pontos_linhas.odt'><img src='LinguagemSQL/index.html@i=file'/> pontos_linhas.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>34.96KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/FiltrarRegistros.odt'><img src='LinguagemSQL/index.html@i=file'/> FiltrarRegistros.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>38.49KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>ALTER TABLE...
+
+ALTER TABLE playground ADD last_maint date;
+
+ALTER TABLE playground DROP last_maint;
+
+
+Podemos
+- adicionar um campo
+- remover um campo
+- adicionar uma constraint
+- remover uma constraint
+- alterar o valor default
+- alterar o tipo de d</pre>'><a href='LinguagemSQL/altertable.txt'><img src='LinguagemSQL/index.html@i=text'/> altertable.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.15KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+
+UPDATE playground SET color = &#039;red&#039; WHERE type = &#039;swing&#039;;
+
+
+</pre>'><a href='LinguagemSQL/criarconsultaupd.txt'><img src='LinguagemSQL/index.html@i=text'/> criarconsultaupd.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>62B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Operadores.odt'><img src='LinguagemSQL/index.html@i=file'/> Operadores.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>33.22KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/DML.odt'><img src='LinguagemSQL/index.html@i=file'/> DML.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>22.92KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula9DML.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula9DML.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>24.98KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+LIMIT - Retorna somente uma quantidade especificada de registros em uma consulta
+O order by complementa.
+
+LIMIT com OFFSET - pular certa quantidade (OFFSET) antes de mostrar uma quantidade
+(limit).
+
+select nome from servidores order by nome limit 15</pre>'><a href='LinguagemSQL/limit.txt'><img src='LinguagemSQL/index.html@i=text'/> limit.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>308B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>EXPRESS&Atilde;O CASE
+
+Similar ao comando IF ... THEN
+Pode ser usada sempre que uma express&atilde;o for v&aacute;lida.
+Cada condi&ccedil;&atilde;o &eacute; uma express&atilde;o que retorna um resultado boleano.
+
+Se a condi&ccedil;&atilde;o resultante for true, o valor da express&atilde;o CASE &eacute; o resultado </pre>'><a href='LinguagemSQL/case_condicional.txt'><img src='LinguagemSQL/index.html@i=text'/> case_condicional.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.12KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula9DML.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula9DML.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>118.64KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Heranca.odt'><img src='LinguagemSQL/index.html@i=file'/> Heranca.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>20.53KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Tipos de Dados no PostgreSQL
+
+O PostgreSQL suporta os tipos de dados padr&otilde;es do SQL ANSI:
+
+Num&eacute;ricos
+	integer
+	arbitr&aacute;ria precis&atilde;o
+	ponto fluruante
+	serial
+Monet&aacute;rio
+Character
+Bin&aacute;rio
+	byea hex
+	bytea escape
+Data/Hora
+	data/hora input
+	data/hor</pre>'><a href='LinguagemSQL/tiposdedados.txt'><img src='LinguagemSQL/index.html@i=text'/> tiposdedados.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>9.2KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Transao
+=========
+
+	begin;
+		abre a transao
+
+	commit;
+		fecha a transao confirmando as alteraes
+
+	rollback;
+		fecha a transao cancelando as alteraes
+
+Niveis de isolamento da transacao
+=================================
+
+	set transaction is</pre>'><a href='LinguagemSQL/Transacao.txt'><img src='LinguagemSQL/index.html@i=text'/> Transacao.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.77KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>DML - Data Manipulation Language
+
+Insert
+Update
+Delete
+Select for Update
+
+INSERT - registros s&atilde;o inseridos um de cada vez. Podemos inserir mais de um 
+registro mas nunca menos de um.
+
+insert into produtos values (1, &#039;Goiana&#039;, 3.55);
+
+Os valores dent</pre>'><a href='LinguagemSQL/dml.txt'><img src='LinguagemSQL/index.html@i=text'/> dml.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.42KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>ROLES
+
+Roles representam grupos ou usu&aacute;rios mas tamb&eacute;m podem conter privil&eacute;gios que
+podem ser atribu&iacute;dos a outros usu&aacute;rios ou grupos juntamente com os privil&eacute;gios.
+
+create role nome password &#039;senha&#039; createdb valid until &#039;31/12/2016&#039;;
+
+alter rol</pre>'><a href='LinguagemSQL/criarusuario_roles.txt'><img src='LinguagemSQL/index.html@i=text'/> criarusuario_roles.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>563B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula5Join.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula5Join.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>239.1KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/FuncoesSQL.odt'><img src='LinguagemSQL/index.html@i=file'/> FuncoesSQL.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>21.88KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/pg_pontoselinhas.odt'><img src='LinguagemSQL/index.html@i=file'/> pg_pontoselinhas.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>31.65KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Tipos de Operadores
+
+== Operadores Aritm&eacute;ticos
+
+Mathematical Operators
+Operator 	Description 	Example 	Result
++ 			addition	 	2 + 3	 	5
+- 			subtraction 	2 - 3 		-1
+* 			multiplication 	2 * 3 		6
+/ 			division 	 	4 / 2 		2
+% 			modulo 		 	5 % 4 		1
+</pre>'><a href='LinguagemSQL/operadores.txt'><img src='LinguagemSQL/index.html@i=text'/> operadores.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>2.16KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula7FuncoesInternas.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula7FuncoesInternas.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>26.64KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+
+createdb nome
+
+sudo -u postgres createdb nome
+
+Receber informa&ccedil;&otilde;es sobre a conex&atilde;o atual
+
+\conninfo
+
+
+</pre>'><a href='LinguagemSQL/criarbanco.txt'><img src='LinguagemSQL/index.html@i=text'/> criarbanco.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>107B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula12ConstraintsIntegrRef.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula12ConstraintsIntegrRef.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>120.41KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/livropg_capitulo9788575221570.pdf'><img src='LinguagemSQL/index.html@i=file'/> livropg_capitulo9788575221570.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>410.55KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Geometricos.pdf'><img src='LinguagemSQL/index.html@i=file'/> Geometricos.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>258.18KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>DCL - Data Control Language
+
+Constitu&iacute;da pelos comandos respons&aacute;veis pela administra&ccedil;&atilde;o dos usu&aacute;rios, grupos e privil&eacute;gios.
+
+
+</pre>'><a href='LinguagemSQL/dcl.txt'><img src='LinguagemSQL/index.html@i=text'/> dcl.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>132B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula10FiltrandoDados.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula10FiltrandoDados.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>214.15KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula4Conjuntos.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula4Conjuntos.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>27.35KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/ConstraintsIntegrRef.odt'><img src='LinguagemSQL/index.html@i=file'/> ConstraintsIntegrRef.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>29.79KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>create function GetAlunos() returns setof identificacao as 
+&#039;select nome from identificacao;&#039; 
+language &#039;sql&#039;;
+
+ou
+
+create function GetAlunos() returns setof identificacao as 
+$$ select nome from identificacao; $$ 
+language &#039;sql&#039;;</pre>'><a href='LinguagemSQL/GetAlunos.txt'><img src='LinguagemSQL/index.html@i=text'/> GetAlunos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>238B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>DDL - Data Definition Language
+
+Select
+Truncate - excluir todos os registros de uma tabela mais rapidamente que com o 
+delete from tabela;
+
+O truncate &eacute; usado somente em tabelas sem relacionamento.
+
+Como receber os dados do banco de dados
+
+Consulta </pre>'><a href='LinguagemSQL/ddl.txt'><img src='LinguagemSQL/index.html@i=text'/> ddl.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>445B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/index.php.html'><img src='LinguagemSQL/index.html@i=file'/> index.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>56.25KB</td>
+                                <td>2024-02-22 08:10:24</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Dicas&#32;SQL.odt'><img src='LinguagemSQL/index.html@i=file'/> Dicas SQL.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>57.86KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr class='success'>
+                                                        
+                                <td><a href='LinguagemSQL/index.html@Li9UcmFuc2Fjb2Vz.html'><img src='LinguagemSQL/index.html@i=folder'/> Transacoes</a></td>
+                                                
+                                <td>=Folder=</td>
+                                <td></td>
+                                <td>2024-02-22 09:13:56</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+
+DELETE FROM playground WHERE type = &#039;slide&#039;;
+
+
+</pre>'><a href='LinguagemSQL/criarconsultadel.txt'><img src='LinguagemSQL/index.html@i=text'/> criarconsultadel.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>49B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/FuncoesInternas.odt'><img src='LinguagemSQL/index.html@i=file'/> FuncoesInternas.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>26.93KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/nulos_sql.odt'><img src='LinguagemSQL/index.html@i=file'/> nulos_sql.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>30.97KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Sub Consultas
+
+Quando temos um select dentro de outro select para recuperar registros filtrados de
+outra consulta.
+
+Mostrar disciplinas que possuem o mesmo nr. de crditos de lgebra:
+
+select disciplinas from disciplinas
+	where creditos = (se</pre>'><a href='LinguagemSQL/SubConsultas.txt'><img src='LinguagemSQL/index.html@i=text'/> SubConsultas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>454B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Select.odt'><img src='LinguagemSQL/index.html@i=file'/> Select.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>15.76KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/views.odt'><img src='LinguagemSQL/index.html@i=file'/> views.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>34.67KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+
+INSERT INTO playground (type, color, location, install_date) VALUES (&#039;slide&#039;, &#039;blue&#039;, &#039;south&#039;, &#039;2014-04-28&#039;);
+INSERT INTO playground (type, color, location, install_date) VALUES (&#039;swing&#039;, &#039;yellow&#039;, &#039;northwest&#039;, &#039;2010-08-16&#039;);
+
+
+</pre>'><a href='LinguagemSQL/criarconsultasins.txt'><img src='LinguagemSQL/index.html@i=text'/> criarconsultasins.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>230B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Fun&ccedil;&otilde;es de Agrega&ccedil;&atilde;o
+
+Estas fun&ccedil;&otilde;es computam um resultado simples de um conjunto de valores.
+
+avg
+count(campo)
+count(*)
+max
+min
+stdder
+sum
+variance
+
+Todas ignoram campos com valor null, exceto count(*)
+
+select funcao(campo) from tabela where cl</pre>'><a href='LinguagemSQL/agregacao.txt'><img src='LinguagemSQL/index.html@i=text'/> agregacao.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>335B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>EXEMPLOS DE JOINS SOFISTICADOS
+
+CREATE TABLE logtable(id serial, tstamp timestamp, message text,mestype int4);
+
+SELECT event.name, comment.comment FROM event, comment
+        WHERE event.id=comment.event_id;
+
+SELECT event.name, comment.comment</pre>'><a href='LinguagemSQL/EXEMPLOS&#32;DE&#32;JOINS&#32;SOFISTICADOS.txt'><img src='LinguagemSQL/index.html@i=text'/> EXEMPLOS DE JOINS SOFISTICADOS.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>681B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Transa&ccedil;&otilde;es
+
+As transa&ccedil;&otilde;es t&ecirc;m como objetivo evitar inconsist&ecirc;ncias em alguns tipos de 
+opera&ccedil;&otilde;es, quando um bloco de comandos &eacute; efetivado ou inteiramente cancelado
+em bloco. Para a execu&ccedil;&atilde;o das transa&ccedil;&otilde;es temos os comandos:
+
+COMMIT
+ROLLB</pre>'><a href='LinguagemSQL/transacoes.txt'><img src='LinguagemSQL/index.html@i=text'/> transacoes.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>460B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Relacionamentos entre tabelas
+
+1 - 1
+1 - N (v&aacute;rios)
+N (v&aacute;rios) - N (v&aacute;rios)
+
+O &uacute;ltimo (N para N) precisa ser dividido em dois, assim:
+
+N -&gt; 1 e 1 &lt;- N
+
+Precisa nascer uma terceira tabela.
+
+
+Integridade Referencial
+
+- N&atilde;o permitir que registros s</pre>'><a href='LinguagemSQL/Relacionamentos.txt'><img src='LinguagemSQL/index.html@i=text'/> Relacionamentos.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>11.21KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>create function InsertAluno(int,text) returns ??? as &#039;
+insert into identificacao values ($1, $2);
+&#039; language &#039;SQL&#039;</pre>'><a href='LinguagemSQL/getCurso.txt'><img src='LinguagemSQL/index.html@i=text'/> getCurso.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>116B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/exemplos_funcoes_triggners_rules.odt'><img src='LinguagemSQL/index.html@i=file'/> exemplos_funcoes_triggners_rules.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>29.27KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Join.odt'><img src='LinguagemSQL/index.html@i=file'/> Join.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>24.03KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula4Conjuntos.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula4Conjuntos.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>25.93KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula11Transacoes.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula11Transacoes.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>306.04KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula8Subconsultas.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula8Subconsultas.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>115.9KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/ConectividadePostgreSQL.odt'><img src='LinguagemSQL/index.html@i=file'/> ConectividadePostgreSQL.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>21.12KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>
+
+SELECT * FROM playground;
+
+
+</pre>'><a href='LinguagemSQL/criarconsultasel.txt'><img src='LinguagemSQL/index.html@i=text'/> criarconsultasel.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>30B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula5Join.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula5Join.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>30.05KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Using&#32;PostgreSQL&#32;and&#32;gnuplot.odt'><img src='LinguagemSQL/index.html@i=file'/> Using PostgreSQL and gnuplot.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>18.79KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Fun&ccedil;&otilde;es com Data e Hora
+
+current_date
+current_tima
+current_timestamp
+date_part()
+date_trunc()
+extract()
+new()
+timeofday()
+
+
+</pre>'><a href='LinguagemSQL/datahora.txt'><img src='LinguagemSQL/index.html@i=text'/> datahora.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>126B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula3DDL.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula3DDL.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>20.34KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula8Subconsultas.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula8Subconsultas.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>27.29KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula1IntroInst.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula1IntroInst.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>432.83KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Completo.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Completo.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.9MB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula6Operadores.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula6Operadores.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>35.8KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/PostgreSQL&#32;ÃÂ¢ÃÂÃÂ&#32;Comandos&#32;Syntaxe.odt'><img src='LinguagemSQL/index.html@i=file'/> PostgreSQL ÃÂ¢ÃÂÃÂ Comandos Syntaxe.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>25.25KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>Fun&ccedil;&otilde;es Nativas
+
+Fun&ccedil;&otilde;es Matem&aacute;ticas
+
+abs
+cbrt
+ceil
+ceiling
+degree
+div
+exp
+floor
+ln
+log
+mod
+pi
+power
+radians
+random
+round
+setseed
+sign
+sqrt
+trunc
+width_bucket
+numeric
+
+Arredondamento
+
+select round (4,3);
+
+round
+-----
+4.000
+
+
+Fun&ccedil;&otilde;es Trigonom&eacute;</pre>'><a href='LinguagemSQL/funcoesnativas.txt'><img src='LinguagemSQL/index.html@i=text'/> funcoesnativas.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>1.84KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula2FiltrarRegistros.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula2FiltrarRegistros.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>280.77KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Heranca.pdf'><img src='LinguagemSQL/index.html@i=file'/> Heranca.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>175.85KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>CREATE TABLE
+
+CREATE TABLE playground (
+    equip_id serial PRIMARY KEY,
+    type varchar (50) NOT NULL,
+    color varchar (25) NOT NULL,
+    location varchar(25) check (location in (&#039;north&#039;, &#039;south&#039;, &#039;west&#039;, &#039;east&#039;, &#039;northeast&#039;, &#039;southeast&#039;, &#039;southw</pre>'><a href='LinguagemSQL/criartabela.txt'><img src='LinguagemSQL/index.html@i=text'/> criartabela.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>627B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula7FuncoesInternas.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula7FuncoesInternas.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>114.42KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>CASTS - Convers&atilde;o expl&iacute;cita de tipos
+
+SQL &eacute; uma linguagem fortemente tipada.
+
+Operador Fatorial !
+
+select 40! as &#039;Fatorial de 40&#039;;
+
+Concatena&ccedil;&atilde;o ||
+
+select text &#039;abc&#039; || &#039;def&#039; AS &#039;Teste&#039;;
+
+Valor Absoluto @
+
+select @ &#039;-4&#039; AS &#039;Absoluto&#039;;
+
+Absoluto</pre>'><a href='LinguagemSQL/casts.txt'><img src='LinguagemSQL/index.html@i=text'/> casts.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>272B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/sqltut.html'><img src='LinguagemSQL/index.html@i=file'/> sqltut.html</a></td>
+                                                
+                                <td>File</td>
+                                <td>144.04KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula14FuncoesTriggers.pdf'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula14FuncoesTriggers.pdf</a></td>
+                                                
+                                <td>File</td>
+                                <td>494.37KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/Modulo1Aula2FiltrarRegistros.odt'><img src='LinguagemSQL/index.html@i=file'/> Modulo1Aula2FiltrarRegistros.odt</a></td>
+                                                
+                                <td>File</td>
+                                <td>43.56KB</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td class='has_popover' title='Preview' data-content='<pre>SELECT INTO
+
+Cria uma nova tabela partindo de uma ou mais tabelas existentes.
+
+A nova tabela conter&aacute; apenas os campos do select. Se * todos, mas se especificados
+apenas os especificados.
+
+select * into informatica from disciplinas where codigo = &#039;in</pre>'><a href='LinguagemSQL/selectinto.txt'><img src='LinguagemSQL/index.html@i=text'/> selectinto.txt</a></td>
+                                                
+                                <td>Text</td>
+                                <td>412B</td>
+                                <td>2024-02-03 11:21:28</td>
+                            </tr>
+                                            
+                            <tr>
+                                                        
+                                <td><a href='LinguagemSQL/style.class.php.html'><img src='LinguagemSQL/index.html@i=file'/> style.class.php</a></td>
+                                                
+                                <td>File</td>
+                                <td>1.22KB</td>
+                                <td>2024-01-31 08:47:00</td>
+                            </tr>
+                                            
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>
